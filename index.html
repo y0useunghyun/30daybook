@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>30 DAYS</title>
+<style>
+  html, body { margin: 0; background: #fff; }
+  /* 배경: 원본 묶음 누끼를 화면 안에서 최대 크기로 */
+  .bundle {
+    position: fixed; inset: 0; margin: auto;
+    max-width: 92vw; max-height: 92vh;
+  }
+  /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
+  .logo {
+    position: fixed; top: 24px; left: 24px;
+    width: 128px; height: 136px; overflow: hidden;
+  }
+  .logo img {
+    width: 421px; /* 원본의 50% */
+    margin: -72px 0 0 -138px;
+  }
+
+  /* 캐릭터: 마우스를 늦게 따라옴. 5초간 안 움직이면 c2(화남) */
+  .buddy {
+    position: fixed; top: 0; left: 0; z-index: 10;
+    width: 100px; height: 90px; overflow: hidden;
+    pointer-events: none; mix-blend-mode: multiply; /* PNG가 흰 배경이라 겹칠 때 흰 박스 안 보이게 */
+    visibility: hidden;
+  }
+  .buddy img { width: 337px; /* 원본의 40% */ display: none; }
+  /* c1·c2는 캔버스 안 그림 위치가 달라서 각각 맞춤 */
+  .buddy .c1 { margin: -82px 0 0 -134px; }
+  .buddy .c2 { margin: -67px 0 0 -124px; }
+  .buddy .c1, .buddy.angry .c2 { display: block; }
+  .buddy.angry .c1 { display: none; }
+  @media not (pointer: fine) { .buddy { display: none; } }
+</style>
+</head>
+<body>
+  <img class="bundle" src="book_cut/bundle_01.png" alt="30일 동안 읽고 쓴 지면을 클립으로 묶은 원본">
+  <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
+  <div class="buddy" aria-hidden="true">
+    <img class="c1" src="c1.png" alt="">
+    <img class="c2" src="c2.png" alt="">
+  </div>
+
+<script>
+  const buddy = document.querySelector('.buddy');
+  const EASE = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0.12;
+  const OFFSET = { x: 14, y: 20 }; // 커서 화살표 오른쪽 아래에 붙도록
+  let target = null, pos = null;
+
+  const IDLE_MS = 5000; // 이 시간 동안 안 움직이면 화남
+  let idleTimer;
+
+  addEventListener('pointermove', e => {
+    target = { x: e.clientX, y: e.clientY };
+    if (!pos) { pos = target; buddy.style.visibility = 'visible'; }
+    buddy.classList.remove('angry');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => buddy.classList.add('angry'), IDLE_MS);
+  });
+  document.addEventListener('pointerleave', () => buddy.style.visibility = 'hidden');
+  document.addEventListener('pointerenter', () => pos && (buddy.style.visibility = 'visible'));
+
+  (function tick() {
+    if (pos) {
+      pos = { x: pos.x + (target.x - pos.x) * EASE, y: pos.y + (target.y - pos.y) * EASE };
+      buddy.style.transform = `translate(${pos.x + OFFSET.x}px, ${pos.y + OFFSET.y}px)`;
+    }
+    requestAnimationFrame(tick);
+  })();
+</script>
+</body>
+</html>
