@@ -6,13 +6,27 @@
 <title>30 DAYS</title>
 <style>
   html, body { margin: 0; background: #fff; }
-  /* 배경: 원본 묶음 누끼를 세로로 세워(글자 바로 읽히게) 화면 안에서 최대 크기로.
-     회전 전 기준이라 가로·세로 제한을 서로 바꿔 줌 */
-  .bundle {
+  /* 배경: 원본 묶음(세로로 세운 누끼)을 화면 안에서 최대 크기로 */
+  .page {
     position: fixed; top: 50%; left: 50%;
-    max-width: 92vh; max-height: 92vw;
-    transform: translate(-50%, -50%) rotate(90deg);
+    transform: translate(-50%, -50%);
   }
+  .page > img { display: block; max-width: 92vw; max-height: 92vh; }
+
+  /* 단어 링크: 로고처럼 마커로 그린 동그라미. 위치는 사진 기준 % */
+  .mark { position: absolute; display: block; }
+  .mark svg { width: 100%; height: 100%; overflow: visible; }
+  .mark path {
+    fill: none; stroke: #000; stroke-width: 2.5;
+    stroke-linecap: round; stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 1; stroke-dashoffset: 0;
+  }
+  /* 올리면 동그라미를 다시 그림 */
+  .mark:hover path, .mark:focus-visible path { animation: redraw .5s ease-out; }
+  @keyframes redraw { from { stroke-dashoffset: 1; } }
+  .mark:focus-visible { outline: none; }
+  @media (prefers-reduced-motion: reduce) { .mark path { animation: none !important; } }
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
   .logo {
     position: fixed; top: 24px; left: 24px;
@@ -40,7 +54,13 @@
 </style>
 </head>
 <body>
-  <img class="bundle" src="book_cut/bundle_01.png" alt="30일 동안 읽고 쓴 지면을 클립으로 묶은 원본">
+  <main class="page">
+    <img src="book_cut/bundle_01_v.png" alt="30일 동안 읽고 쓴 지면을 클립으로 묶은 원본">
+    <!-- ponytail: 링크 대상 미정이라 #앵커. 정해지면 href만 교체 -->
+    <a class="mark" href="#개개인" aria-label="개개인" style="left:45.5%; top:37%; width:11.5%; height:4.8%"></a>
+    <a class="mark" href="#네트워크" aria-label="네트워크" style="left:49.8%; top:46.4%; width:11.5%; height:4.8%"></a>
+    <a class="mark" href="#학생" aria-label="학생" style="left:28.8%; top:82.4%; width:8%; height:4.8%"></a>
+  </main>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
@@ -48,6 +68,10 @@
   </div>
 
 <script>
+  // 손그림 동그라미 (끝이 살짝 겹치게 한 붓질)
+  const LOOP = '<svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M10 24 C6 10 38 2 68 4 C90 6 99 18 90 29 C79 40 32 41 13 34 C2 29 5 14 24 8"/></svg>';
+  document.querySelectorAll('.mark').forEach(a => a.insertAdjacentHTML('beforeend', LOOP));
+
   const buddy = document.querySelector('.buddy');
   const EASE = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0.12;
   const OFFSET = { x: 14, y: 20 }; // 커서 화살표 오른쪽 아래에 붙도록
