@@ -6,10 +6,12 @@
 <title>30 DAYS</title>
 <style>
   html, body { margin: 0; background: #fff; }
-  /* 배경: 원본 묶음 누끼를 화면 안에서 최대 크기로 */
+  /* 배경: 원본 묶음 누끼를 세로로 세워(글자 바로 읽히게) 화면 안에서 최대 크기로.
+     회전 전 기준이라 가로·세로 제한을 서로 바꿔 줌 */
   .bundle {
-    position: fixed; inset: 0; margin: auto;
-    max-width: 92vw; max-height: 92vh;
+    position: fixed; top: 50%; left: 50%;
+    max-width: 92vh; max-height: 92vw;
+    transform: translate(-50%, -50%) rotate(90deg);
   }
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
   .logo {
