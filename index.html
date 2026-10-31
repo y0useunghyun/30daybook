@@ -46,12 +46,9 @@
   .sheets img { user-select: none; -webkit-user-drag: none; }
   .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */
 
-  /* 결과물·복잡이 열리면 검은 막으로 배경을 죽임 (애니메이션 없이). 종이들은 그 위에 뜸 */
-  .dim {
-    display: none; position: fixed; inset: 0; z-index: 7; pointer-events: none;
-    background: rgba(0, 0, 0, .1);
-  }
-  body:has(.sheets:target, .mess:target) .dim { display: block; }
+  /* 흰 종이가 흰 바탕에 묻히지 않게 아주 연한 그림자 (띠·복잡·크게 보기 공통) */
+  :root { --paper-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 4px 12px rgba(0, 0, 0, .08); }
+  .sheets .sheet img, .paper, .zoom .sheet img { box-shadow: var(--paper-shadow); }
 
   /* 복잡: 앞뒤 60장이 화면에 우수수. 빈 곳은 클릭이 배경으로 통과(→ 닫힘) */
   .mess {
@@ -123,7 +120,6 @@
     <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
     <a class="mark" href="#mess" aria-label="복잡 — 모든 종이 쏟기" style="left:67.8%; top:32.3%; width:4.6%; height:3.4%"></a>
   </main>
-  <div class="dim"></div>
   <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
   <section id="mess" class="mess" aria-label="모든 종이"></section>
   <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
