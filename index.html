@@ -31,8 +31,10 @@
   @media (prefers-reduced-motion: reduce) { .mark path { animation: none !important; } }
   /* 30일치 지면: 주소가 #result일 때 배경 위, 화면 가운데 1/3 띠에 한 줄로. 윗선 맞춤, 옆으로 넘겨 봄 */
   .sheets {
-    --band: 33.333vh;
-    display: none; position: fixed; left: 0; right: 0; top: var(--band); height: var(--band); z-index: 8;
+    /* 한 화면에 4장 반. 폰처럼 좁으면 최소 240px */
+    --per-screen: 4.5;
+    --sheet-w: max(calc((100vw - 24px) / var(--per-screen) - 24px), 240px);
+    display: none; position: fixed; left: 0; right: 0; top: 33.333vh; z-index: 8;
     overflow-x: auto; overflow-y: hidden; overscroll-behavior: contain;
     padding: 0 24px; gap: 24px; align-items: flex-start;
     scrollbar-width: none;
@@ -45,8 +47,8 @@
     transform-style: preserve-3d; transition: transform .6s ease;
   }
   .sheet.flipped { transform: rotateY(180deg); }
-  /* 높이 = 원본 스캔 높이 비율 × 띠 높이 (가장 큰 지면이 띠에 꽉) → 종이 실제 크기 차이 유지 */
-  .sheet img { display: block; width: auto; height: calc(var(--h) * var(--band)); backface-visibility: hidden; }
+  /* 너비 = 원본 스캔 너비 비율 × 기준 너비 → 종이 실제 크기 차이 유지 */
+  .sheet img { display: block; width: calc(var(--w) * var(--sheet-w)); height: auto; backface-visibility: hidden; }
   .sheet .back { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
 
@@ -99,13 +101,13 @@
   // 결과물: 앞면 30장 (pages/front·back/day01~30.jpg)
   // 원본 스캔 크기 [w, h] — 웹용은 줄여서 실제 크기 비율이 없어 여기서 씀
   const SCAN = [[1627,1548],[1639,1764],[1656,1924],[1650,1548],[1629,1228],[1691,1316],[1704,1796],[1653,1688],[1639,1556],[1623,1168],[1602,1152],[1653,1616],[1629,1404],[1616,1412],[1619,1124],[1616,1408],[1619,1332],[1616,1264],[1639,1496],[1639,1288],[1626,1140],[1632,1496],[1646,1388],[1619,940],[1639,980],[1605,1372],[1612,1636],[1616,1608],[1670,680],[1707,1072]];
-  const SCAN_MAX_H = Math.max(...SCAN.map(([, h]) => h));
+  const SCAN_MAX_W = Math.max(...SCAN.map(([w]) => w));
   const pad = n => String(n).padStart(2, '0');
   const sheets = document.getElementById('result');
   sheets.innerHTML = SCAN.map(([w, h], i) => {
     const d = pad(i + 1);
     return `<button class="sheet" type="button" aria-label="${i + 1}일차 지면 (누르면 뒷면)">
-      <img src="pages/front/day${d}.jpg" alt="" loading="lazy" width="${w}" height="${h}" style="--h:${h / SCAN_MAX_H}">
+      <img src="pages/front/day${d}.jpg" alt="" loading="lazy" width="${w}" height="${h}" style="--w:${w / SCAN_MAX_W}">
       <img class="back" src="pages/back/day${d}.jpg" alt="" loading="lazy">
     </button>`;
   }).join('');
