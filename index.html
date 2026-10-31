@@ -78,8 +78,6 @@
     margin: -10px 0 0; max-width: 30em; padding: 10px 14px; background: #fff; /* 배경 사진 글자와 안 겹치게. 위 여백만큼 올려 첫 줄을 INFO와 같은 높이로 */
     font-size: 16px; line-height: 1.75; word-break: keep-all;
   }
-  /* 메뉴 화면이 열려 있는 동안엔 로고 메뉴도 계속 보임 */
-  body:has(.books:target, .info:target) .side { display: block; }
   .books img { display: block; width: var(--paper-w); height: auto; box-shadow: var(--paper-shadow); }
 
   /* 계산: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
@@ -133,18 +131,28 @@
     mix-blend-mode: multiply; z-index: 10; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록·사이드탭 위에도 떠서 홈 버튼 역할 */
   }
 
-  /* 로고 메뉴: 로고 위에 잠깐 머물면 바로 밑에 INFO·BOOK 두 줄만 나타남 (그냥 누르면 홈). JS가 .open */
+  /* 로고 메뉴: 로고 바로 밑에 INFO·BOOK 두 줄, 항상 보임 */
   .side {
     position: fixed; left: 24px; top: 160px; z-index: 10;
-    padding: 32px 4px 12px; /* 로고와 띄우되 안쪽 여백이라 로고 아래와 맞붙어서 마우스 옮길 때 안 끊기게 */
-    display: none;
+    padding: 32px 4px 12px;
   }
-  .side.open { display: block; }
   .side a { display: block; padding: 3px 0; color: #000; text-decoration: none; font-size: 17px; letter-spacing: .04em; }
   .side a:hover, .side a:focus-visible { text-decoration: underline; text-underline-offset: 4px; outline: none; }
   .logo img {
     width: 421px; /* 원본의 50% */
     margin: -72px 0 0 -138px;
+  }
+
+  /* 폰(마우스 올리기 없는 기기·좁은 화면): 로고 작게, INFO·BOOK은 오른쪽 위 헤더에 항상 보임.
+     INFO·BOOK 화면은 헤더 아래 전체 폭으로 */
+  @media (hover: none), (max-width: 600px) {
+    .logo { top: 16px; left: 16px; width: 80px; height: 85px; } /* 128×136의 62.5% */
+    .logo img { width: 263px; margin: -45px 0 0 -86px; }
+    .side { display: flex; gap: 18px; top: 44px; left: auto; right: 16px; padding: 0; }
+    .side a { font-size: 16px; }
+    .books, .info { top: 120px !important; left: 16px; right: 16px; }
+    .books { --paper-w: calc((100vw - 32px - 24px) / 3); gap: 12px; }
+    .info p { margin-top: 0; max-width: none; }
   }
 
   /* 캐릭터: 마우스를 늦게 따라옴. 평소 c2(웃음), 5초간 안 움직이면 c1(화남) */
@@ -594,27 +602,6 @@
   page.addEventListener('pointerup', release);
   page.addEventListener('pointercancel', release);
   page.addEventListener('dblclick', () => { view = { s: 1, x: 0, y: 0 }; render(); });
-
-  // 로고 메뉴: 로고 위에 SIDE_OPEN_DELAY_MS 머물러야 열림 → 그냥 눌러 새로고침할 땐 안 열림.
-  // 새로고침 직후 마우스가 이미 로고 위면, 로고 밖으로 한 번 나가야 다시 열 수 있음
-  const side = document.querySelector('.side');
-  const logo = document.querySelector('.logo');
-  const SIDE_OPEN_DELAY_MS = 500;
-  let sideArmed = false, sideTimer;
-  const setSide = open => side.classList.toggle('open', open);
-  addEventListener('pointermove', e => {
-    if (!sideArmed && e.pointerType === 'mouse' && !logo.contains(e.target)) sideArmed = true;
-  });
-  logo.addEventListener('pointerenter', e => {
-    if (e.pointerType !== 'mouse' || !sideArmed) return;
-    sideTimer = setTimeout(() => setSide(true), SIDE_OPEN_DELAY_MS);
-  });
-  logo.addEventListener('pointerleave', e => {
-    clearTimeout(sideTimer);
-    if (!side.contains(e.relatedTarget)) setSide(false);
-  });
-  logo.addEventListener('click', () => clearTimeout(sideTimer));
-  side.addEventListener('pointerleave', e => { if (!logo.contains(e.relatedTarget)) setSide(false); });
 
   const buddy = document.querySelector('.buddy');
   const EASE = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0.12;
