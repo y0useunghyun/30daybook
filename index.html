@@ -118,18 +118,21 @@
     mix-blend-mode: multiply; z-index: 10; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록·사이드탭 위에도 떠서 홈 버튼 역할 */
   }
 
-  /* 사이드탭: 로고에 마우스 올리면 왼쪽에서 나옴 (로고 클릭=홈은 그대로). 마우스 있는 기기만 */
+  /* 사이드탭: 로고 위에 잠깐 머물면 왼쪽에서 나옴 (그냥 누르면 홈). 여닫기는 JS가 .open으로 */
   .side {
-    position: fixed; left: 0; top: 0; bottom: 0; z-index: 9; width: 200px;
-    padding: 184px 28px 24px; box-sizing: border-box;
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 9; width: 260px;
+    padding: 184px 28px 24px; box-sizing: border-box; overflow-y: auto;
     background: #fff; box-shadow: var(--paper-shadow);
     transform: translateX(-100%); transition: transform .2s ease;
   }
-  .side a { display: block; padding: 6px 0; color: #000; text-decoration: none; font-size: 18px; }
-  .side a:hover, .side a:focus-visible { text-decoration: underline; text-underline-offset: 4px; outline: none; }
-  @media (hover: hover) {
-    .logo:hover ~ .side, .side:hover, .side:focus-within { transform: none; }
-  }
+  .side.open { transform: none; }
+  .side h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: #888; }
+  .side section + section { margin-top: 32px; }
+  .side ul { margin: 0; padding: 0; list-style: none; }
+  .side li { padding: 4px 0; font-size: 16px; }
+  .side p { margin: 0; font-size: 15px; line-height: 1.6; }
+  .side p:empty { display: none; }
+  .side section:has(p:empty) { display: none; } /* 소개 글 넣기 전엔 숨김 */
   @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
   .logo img {
     width: 421px; /* 원본의 50% */
@@ -179,11 +182,23 @@
     </button>
   </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
-  <nav class="side" aria-label="바로가기">
-    <a href="#result">결과물</a>
-    <a href="#mess">복잡</a>
-    <a href="#count">계산</a>
-  </nav>
+  <aside class="side" aria-label="소개와 읽은 책">
+    <section>
+      <h2>소개</h2>
+      <p><!-- 소개 글 자리 (비어 있으면 섹션 숨김) --></p>
+    </section>
+    <section>
+      <h2>읽은 책</h2>
+      <!-- ponytail: 표지 이미지 받으면 각 li에 <img> 추가 -->
+      <ul>
+        <li>전술적 출판</li>
+        <li>디자이너란 무엇인가</li>
+        <li>멀티플 시그니처</li>
+        <li>타이포그래피 에세이</li>
+        <li>책의 여백에서</li>
+      </ul>
+    </section>
+  </aside>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
     <img class="c2" src="c2.png" alt="">
@@ -562,6 +577,27 @@
   page.addEventListener('pointerup', release);
   page.addEventListener('pointercancel', release);
   page.addEventListener('dblclick', () => { view = { s: 1, x: 0, y: 0 }; render(); });
+
+  // 사이드탭: 로고 위에 SIDE_OPEN_DELAY_MS 머물러야 열림 → 그냥 눌러 새로고침할 땐 안 열림.
+  // 새로고침 직후 마우스가 이미 로고 위면, 로고 밖으로 한 번 나가야 다시 열 수 있음
+  const side = document.querySelector('.side');
+  const logo = document.querySelector('.logo');
+  const SIDE_OPEN_DELAY_MS = 500;
+  let sideArmed = false, sideTimer;
+  const setSide = open => side.classList.toggle('open', open);
+  addEventListener('pointermove', e => {
+    if (!sideArmed && e.pointerType === 'mouse' && !logo.contains(e.target)) sideArmed = true;
+  });
+  logo.addEventListener('pointerenter', e => {
+    if (e.pointerType !== 'mouse' || !sideArmed) return;
+    sideTimer = setTimeout(() => setSide(true), SIDE_OPEN_DELAY_MS);
+  });
+  logo.addEventListener('pointerleave', e => {
+    clearTimeout(sideTimer);
+    if (!side.contains(e.relatedTarget)) setSide(false);
+  });
+  logo.addEventListener('click', () => clearTimeout(sideTimer));
+  side.addEventListener('pointerleave', e => { if (!logo.contains(e.relatedTarget)) setSide(false); });
 
   const buddy = document.querySelector('.buddy');
   const EASE = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0.12;
