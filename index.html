@@ -319,7 +319,10 @@
     guessInput.classList.toggle('said', strong);
     gameHint.textContent = msg;
   };
+  const NEXT_ROUND_MS = 2000; // 결과 보여주고 다음 종이로 넘어가기까지
+  let nextTimer;
   function newRound() {
+    clearTimeout(nextTimer);
     const day = Math.floor(Math.random() * DAYS);
     round = { day, answer: CHAR_COUNTS[day], left: GUESS_TRIES, over: false };
     gameImg.src = `pages/front/day${pad(day + 1)}.jpg`;
@@ -327,10 +330,13 @@
     say(GAME_ASK, false);
     guessInput.focus({ preventScroll: true });
   }
+  // 결과 보여주고 잠시 뒤 저절로 다음 종이 (Enter·종이 누르기로 바로 넘김)
   const endRound = msg => {
     round = { ...round, over: true };
-    say(`${msg} 엔터로 다음 종이!`);
+    say(msg);
+    nextTimer = setTimeout(() => { if (location.hash === '#count') newRound(); }, NEXT_ROUND_MS);
   };
+  gameImg.addEventListener('click', () => { if (round?.over) newRound(); });
   // Enter: 판 끝났으면 다음 종이, 아니면 채점
   gameForm.addEventListener('submit', e => {
     e.preventDefault();
