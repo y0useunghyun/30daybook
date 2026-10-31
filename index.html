@@ -248,7 +248,8 @@
     });
   }
   // 닫기: 누른 점 → 각 종이 중심 방향으로 화면 밖까지 날아감. 가까운 종이부터 출발
-  const SCATTER_MS = 600;
+  const SCATTER_MS = 1000;
+  const SCATTER_SPREAD_MS = 250; // 가까운 종이와 먼 종이의 출발 시간 차
   let scattering = false;
   function scatterPapers(x, y) {
     if (scattering) return;
@@ -262,7 +263,7 @@
       const out = { x: p.x + dx / d * far, y: p.y + dy / d * far, r: p.r + rand(-180, 180) };
       return img.animate(
         [{ transform: img.style.transform }, { transform: `translate(${out.x}px, ${out.y}px) rotate(${out.r}deg)` }],
-        { duration: SCATTER_MS, delay: d / far * 150, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' }
+        { duration: SCATTER_MS, delay: d / far * SCATTER_SPREAD_MS, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' }
       ).finished;
     });
     Promise.all(runs).then(() => { if (scattering) location.hash = ''; }, () => {}); // 중간에 취소되면 무시
