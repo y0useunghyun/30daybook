@@ -10,11 +10,13 @@
   .page {
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
+    touch-action: none; cursor: grab;
   }
-  .page > img { display: block; max-width: 92vw; max-height: 92vh; }
+  .page.dragging { cursor: grabbing; }
+  .page > img { display: block; max-width: 92vw; max-height: 92vh; user-select: none; -webkit-user-drag: none; }
 
   /* 단어 링크: 로고처럼 마커로 그린 동그라미. 위치는 사진 기준 % */
-  .mark { position: absolute; display: block; }
+  .mark { position: absolute; display: block; transform: rotate(12deg); /* 사진 속 글줄 기울기 */ }
   .mark svg { width: 100%; height: 100%; overflow: visible; }
   .mark path {
     fill: none; stroke: #000; stroke-width: 2.5;
@@ -27,10 +29,29 @@
   @keyframes redraw { from { stroke-dashoffset: 1; } }
   .mark:focus-visible { outline: none; }
   @media (prefers-reduced-motion: reduce) { .mark path { animation: none !important; } }
+  /* 30일치 지면: 주소가 #result일 때만 보임. ponytail: 엮는 방식 정해지기 전 임시 격자 */
+  .sheets {
+    display: none; position: fixed; inset: 0; z-index: 8;
+    overflow-y: auto; background: #fff;
+    padding: 176px 24px 48px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 32px 24px; align-items: start;
+  }
+  .sheets:target { display: grid; }
+  .sheet {
+    position: relative; padding: 0; border: 0; background: none; cursor: pointer;
+    transform-style: preserve-3d; transition: transform .6s ease;
+  }
+  .sheet.flipped { transform: rotateY(180deg); }
+  .sheet img { display: block; width: 100%; backface-visibility: hidden; }
+  .sheet .back { position: absolute; inset: 0; height: 100%; object-fit: contain; transform: rotateY(180deg); }
+  @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
+
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
   .logo {
     position: fixed; top: 24px; left: 24px;
     width: 128px; height: 136px; overflow: hidden;
+    mix-blend-mode: multiply; z-index: 9; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록 위에도 떠서 홈 버튼 역할 */
   }
   .logo img {
     width: 421px; /* 원본의 50% */
@@ -55,12 +76,12 @@
 </head>
 <body>
   <main class="page">
-    <img src="book_cut/bundle_01_v.png" alt="30일 동안 읽고 쓴 지면을 클립으로 묶은 원본">
-    <!-- ponytail: 링크 대상 미정이라 #앵커. 정해지면 href만 교체 -->
-    <a class="mark" href="#개개인" aria-label="개개인" style="left:45.5%; top:37%; width:11.5%; height:4.8%"></a>
-    <a class="mark" href="#네트워크" aria-label="네트워크" style="left:49.8%; top:46.4%; width:11.5%; height:4.8%"></a>
-    <a class="mark" href="#학생" aria-label="학생" style="left:28.8%; top:82.4%; width:8%; height:4.8%"></a>
+    <img src="main/main_02.png" alt="클립으로 묶은 원문 지면과 사견 묶음">
+    <!-- ponytail: 링크 대상 미정이라 #앵커 -->
+    <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
   </main>
+  <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
+  <section id="result" class="sheets" aria-label="30일치 지면"></section>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
@@ -71,6 +92,75 @@
   // 손그림 동그라미 (끝이 살짝 겹치게 한 붓질)
   const LOOP = '<svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M10 24 C6 10 38 2 68 4 C90 6 99 18 90 29 C79 40 32 41 13 34 C2 29 5 14 24 8"/></svg>';
   document.querySelectorAll('.mark').forEach(a => a.insertAdjacentHTML('beforeend', LOOP));
+
+  // 결과물: 앞면 30장 (pages/front·back/day01~30.jpg)
+  const DAYS = 30;
+  const pad = n => String(n).padStart(2, '0');
+  const sheets = document.getElementById('result');
+  sheets.innerHTML = Array.from({ length: DAYS }, (_, i) => {
+    const d = pad(i + 1);
+    return `<button class="sheet" type="button" aria-label="${i + 1}일차 지면 (누르면 뒷면)">
+      <img src="pages/front/day${d}.jpg" alt="" loading="lazy">
+      <img class="back" src="pages/back/day${d}.jpg" alt="" loading="lazy">
+    </button>`;
+  }).join('');
+  sheets.addEventListener('click', e => e.target.closest('.sheet')?.classList.toggle('flipped'));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && location.hash === '#result') location.hash = ''; });
+
+  // 배경 확대·축소: 휠/트랙패드 핀치, 폰 두 손가락, 드래그로 이동, 더블클릭으로 원래대로
+  const page = document.querySelector('.page');
+  const ZOOM_MIN = 0.3, ZOOM_MAX = 5;
+  let view = { s: 1, x: 0, y: 0 };
+  const pointers = new Map();
+  let pinchStart = null;
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const render = () => page.style.transform =
+    `translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px)) scale(${view.s})`;
+  // (cx, cy) 화면 지점을 기준으로 배율 변경 → 커서 아래 지점이 그대로 머묾
+  function zoomAt(s, cx, cy) {
+    s = clamp(s, ZOOM_MIN, ZOOM_MAX);
+    const ox = cx - innerWidth / 2 - view.x, oy = cy - innerHeight / 2 - view.y;
+    const k = s / view.s;
+    view = { s, x: view.x + ox * (1 - k), y: view.y + oy * (1 - k) };
+    render();
+  }
+
+  addEventListener('wheel', e => {
+    if (location.hash === '#result') return; // 지면 목록은 그냥 스크롤
+    e.preventDefault();
+    zoomAt(view.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), e.clientX, e.clientY);
+  }, { passive: false });
+
+  page.addEventListener('pointerdown', e => {
+    if (e.target.closest('.mark')) return;
+    page.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    page.classList.add('dragging');
+  });
+  page.addEventListener('pointermove', e => {
+    const prev = pointers.get(e.pointerId);
+    if (!prev) return;
+    const cur = { x: e.clientX, y: e.clientY };
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()].map(p => p === prev ? cur : p);
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (!pinchStart) pinchStart = { dist, s: view.s };
+      zoomAt(pinchStart.s * dist / pinchStart.dist, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    } else {
+      view = { ...view, x: view.x + cur.x - prev.x, y: view.y + cur.y - prev.y };
+      render();
+    }
+    pointers.set(e.pointerId, cur);
+  });
+  const release = e => {
+    pointers.delete(e.pointerId);
+    pinchStart = null;
+    if (!pointers.size) page.classList.remove('dragging');
+  };
+  page.addEventListener('pointerup', release);
+  page.addEventListener('pointercancel', release);
+  page.addEventListener('dblclick', () => { view = { s: 1, x: 0, y: 0 }; render(); });
 
   const buddy = document.querySelector('.buddy');
   const EASE = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0.12;
