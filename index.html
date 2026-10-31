@@ -332,9 +332,11 @@
   guessInput.addEventListener('input', () => { guessInput.classList.remove('said'); fitInput(); });
   document.fonts.ready.then(fitInput); // SUIT 늦게 오면 다시 맞춤
   const NEXT_ROUND_MS = 2000; // 결과 보여주고 다음 종이로 넘어가기까지
-  let nextTimer;
+  const HINT_MS = 1000; // UP/DOWN 보여주는 시간
+  let nextTimer, hintTimer;
   function newRound() {
     clearTimeout(nextTimer);
+    clearTimeout(hintTimer);
     const day = Math.floor(Math.random() * DAYS);
     round = { day, answer: CHAR_COUNTS[day], left: GUESS_TRIES, over: false };
     gameImg.src = `pages/front/day${pad(day + 1)}.jpg`;
@@ -344,6 +346,7 @@
   }
   // 결과 보여주고 잠시 뒤 저절로 다음 종이 (Enter·종이 누르기로 바로 넘김)
   const endRound = msg => {
+    clearTimeout(hintTimer);
     round = { ...round, over: true };
     say(msg);
     nextTimer = setTimeout(() => { if (location.hash === '#count') newRound(); }, NEXT_ROUND_MS);
@@ -360,6 +363,13 @@
     if (Math.abs(guess - round.answer) <= GUESS_TOLERANCE) return endRound(`정답! ${round.answer}자였습니다.`);
     if (!round.left) return endRound(`${round.answer}자였습니다.`);
     say(guess < round.answer ? 'UP' : 'DOWN');
+    // UP/DOWN은 잠깐만 보여주고 다시 질문으로 (그새 숫자 치기 시작했으면 안내만 조용히 바꿈)
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => {
+      if (round.over) return;
+      if (guessInput.value) guessInput.placeholder = GAME_ASK;
+      else say(GAME_ASK, false);
+    }, HINT_MS);
   });
 
   const onHash = () => {
