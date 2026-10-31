@@ -50,12 +50,12 @@
   .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */
 
   /* 흰 종이가 흰 바탕에 묻히지 않게 아주 연한 그림자 (띠·복잡·크게 보기 공통) */
-  :root { --paper-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 4px 12px rgba(0, 0, 0, .08); }
+  :root { --paper-w: clamp(120px, 12vw, 200px); /* 복잡 종이·BOOK 표지 공통 크기 */
+    --paper-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 4px 12px rgba(0, 0, 0, .08); }
   .sheets .sheet img, .paper, .zoom .sheet img { box-shadow: var(--paper-shadow); }
 
   /* 복잡: 앞뒤 60장이 화면에 우수수. 빈 곳은 클릭이 배경으로 통과(→ 닫힘) */
   .mess {
-    --paper-w: clamp(120px, 12vw, 200px);
     display: none; position: fixed; inset: 0; z-index: 8; overflow: hidden; pointer-events: none;
   }
   .mess:target { display: block; }
@@ -66,6 +66,15 @@
     user-select: none; -webkit-user-drag: none;
   }
   .paper.dragging { cursor: grabbing; }
+
+  /* BOOK: 읽은 책 표지 5개를 배경 위 가운데에 한 줄로 (복잡 종이 크기) */
+  .books {
+    display: none; position: fixed; inset: 0; z-index: 8;
+    align-items: center; justify-content: center; flex-wrap: wrap; gap: 24px; padding: 24px;
+  }
+  .books:target { display: flex; }
+  .books:focus { outline: none; }
+  .books img { display: block; width: var(--paper-w); height: auto; box-shadow: var(--paper-shadow); }
 
   /* 계산: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
   .game { display: none; position: fixed; inset: 0; z-index: 8; place-items: center; }
@@ -167,6 +176,14 @@
   </section>
   <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
   <section id="mess" class="mess" aria-label="모든 종이"></section>
+  <!-- BOOK: 읽은 책 표지 (알라딘 표지 이미지) -->
+  <section id="book" class="books" aria-label="읽은 책">
+    <img src="covers/tactical.jpg" alt="전술적 출판 — 알레산드로 루도비코">
+    <img src="covers/designer.jpg" alt="디자이너란 무엇인가 — 노먼 포터">
+    <img src="covers/multiple.jpg" alt="멀티플 시그니처 — 마이클 록">
+    <img src="covers/typo.jpg" alt="타이포그래피 에세이 — 에릭 슈피커만">
+    <img src="covers/margin.jpg" alt="책의 여백에서 — 기쿠치 노부요시 외">
+  </section>
   <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
   <section id="result" class="sheets" aria-label="30일치 지면"></section>
   <div class="zoom" hidden role="dialog" aria-label="지면 크게 보기">
@@ -176,7 +193,7 @@
   </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
   <nav class="side" aria-label="메뉴">
-    <!-- ponytail: 내용 아직 없음. INFO·BOOK 화면 생기면 연결 -->
+    <!-- ponytail: INFO 화면은 아직 없음 -->
     <a href="#info">INFO</a>
     <a href="#book">BOOK</a>
   </nav>
@@ -234,7 +251,7 @@
   // click 대신 pointerup: 아이폰 사파리는 빈 영역 탭에 click을 안 보내서 모바일에서 안 닫혔음
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
   const SWALLOW_CLICK_MS = 400;
-  const isOpen = () => ['#result', '#mess', '#count'].includes(location.hash);
+  const isOpen = () => ['#result', '#mess', '#count', '#book'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
   addEventListener('pointerup', e => {
@@ -242,7 +259,7 @@
     const target = downAt?.target; // 캡처 중이면 e.target이 바뀌어서 누른 곳 기준
     downAt = null;
     if (!tap || !isOpen() || !zoom.hidden) return;
-    if (target?.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo, .side')) return;
+    if (target?.closest('.sheets, .paper, .game-card, .books img, .zoom, .mark, .logo, .side')) return;
     // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게 한 번 삼킴
     const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
     addEventListener('click', swallow, { capture: true, once: true });
@@ -519,7 +536,7 @@
 
   addEventListener('wheel', e => {
     // 크게 보기·복잡·글자수 게임 중엔 뒤 배경 안 움직임
-    if (!zoom.hidden || location.hash === '#mess' || location.hash === '#count') { e.preventDefault(); return; }
+    if (!zoom.hidden || ['#mess', '#count', '#book'].includes(location.hash)) { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
