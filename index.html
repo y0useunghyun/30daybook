@@ -193,13 +193,15 @@
     const moved = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > TAP_SLOP_PX;
     if (moved || !isOpen() || !zoom.hidden) return;
     if (e.target.closest('.sheets, .paper, .zoom, .mark, .logo')) return;
-    location.hash = '';
+    close(e.clientX, e.clientY);
   });
   addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (!zoom.hidden) zoom.hidden = true;
-    else if (isOpen()) location.hash = '';
+    else if (isOpen()) close(innerWidth / 2, innerHeight / 2);
   });
+  // 복잡은 (x, y)에서 종이들이 사방으로 퍼져 나간 뒤 닫힘
+  const close = (x, y) => location.hash === '#mess' ? scatterPapers(x, y) : (location.hash = '');
 
   // 복잡: 앞뒤 60장을 위에서 우수수 떨굼. 열 때마다 새로 흩어짐
   const mess = document.getElementById('mess');
@@ -229,7 +231,9 @@
   function dropPapers() {
     const shuffled = [...papers].sort(() => Math.random() - .5);
     const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scattering = false;
     shuffled.forEach((img, k) => {
+      img.getAnimations().forEach(a => a.cancel()); // 지난번 퍼짐 애니메이션 잔상 제거
       if (!img.src) img.src = img.dataset.small;
       mess.append(img); // 순서대로 쌓임 (나중 것이 위)
       img.style.zIndex = paperTop = k;
@@ -243,6 +247,27 @@
       );
     });
   }
+  // 닫기: 누른 점 → 각 종이 중심 방향으로 화면 밖까지 날아감. 가까운 종이부터 출발
+  const SCATTER_MS = 600;
+  let scattering = false;
+  function scatterPapers(x, y) {
+    if (scattering) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { location.hash = ''; return; }
+    scattering = true;
+    const far = Math.hypot(innerWidth, innerHeight);
+    const runs = papers.map(img => {
+      const p = paperPos.get(img);
+      const cx = p.x + img.offsetWidth / 2, cy = p.y + img.offsetHeight / 2;
+      const dx = cx - x, dy = cy - y, d = Math.hypot(dx, dy) || 1;
+      const out = { x: p.x + dx / d * far, y: p.y + dy / d * far, r: p.r + rand(-180, 180) };
+      return img.animate(
+        [{ transform: img.style.transform }, { transform: `translate(${out.x}px, ${out.y}px) rotate(${out.r}deg)` }],
+        { duration: SCATTER_MS, delay: d / far * 150, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' }
+      ).finished;
+    });
+    Promise.all(runs).then(() => { if (scattering) location.hash = ''; }, () => {}); // 중간에 취소되면 무시
+  }
+
   const onHash = () => { if (location.hash === '#mess') dropPapers(); };
   addEventListener('hashchange', onHash);
   onHash();
@@ -251,7 +276,7 @@
   let held = null;
   mess.addEventListener('pointerdown', e => {
     const img = e.target.closest('.paper');
-    if (!img) return;
+    if (!img || scattering) return;
     img.getAnimations().forEach(a => a.finish());
     img.setPointerCapture(e.pointerId);
     img.style.zIndex = ++paperTop;
