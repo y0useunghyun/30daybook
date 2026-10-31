@@ -52,6 +52,17 @@
   .sheet .back { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
 
+  /* 크게 보기: 띠에서 누른 지면을 가운데 크게. 지면 누르면 뒷면, 바깥 누르면 닫힘 */
+  .zoom {
+    position: fixed; inset: 0; z-index: 9;
+    display: grid; place-items: center;
+    background: rgba(255, 255, 255, .9);
+  }
+  .zoom[hidden] { display: none; }
+  .zoom .sheet img { width: auto; max-width: 90vw; max-height: 90vh; }
+  .zoom .sheet .back { width: 100%; height: 100%; max-width: none; max-height: none; }
+  .zoom .sheet:focus { outline: none; } /* 열 때 지면에 주는 포커스 테두리 숨김 (화면에 지면 하나뿐) */
+
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
   .logo {
     position: fixed; top: 24px; left: 24px;
@@ -87,6 +98,11 @@
   </main>
   <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
   <section id="result" class="sheets" aria-label="30일치 지면"></section>
+  <div class="zoom" hidden role="dialog" aria-label="지면 크게 보기">
+    <button class="sheet" type="button" aria-label="누르면 뒷면">
+      <img class="front" alt=""><img class="back" alt="">
+    </button>
+  </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
@@ -113,8 +129,29 @@
       <img class="back" src="pages/back/day${d}.jpg" alt="" loading="lazy">
     </button>`;
   }).join('');
-  sheets.addEventListener('click', e => e.target.closest('.sheet')?.classList.toggle('flipped'));
-  addEventListener('keydown', e => { if (e.key === 'Escape' && location.hash === '#result') location.hash = ''; });
+  // 띠에서 누르면 크게 보기
+  const zoom = document.querySelector('.zoom');
+  const zoomSheet = zoom.querySelector('.sheet');
+  sheets.addEventListener('click', e => {
+    const s = e.target.closest('.sheet');
+    if (!s) return;
+    const [front, back] = s.querySelectorAll('img');
+    zoom.querySelector('.front').src = front.src;
+    zoom.querySelector('.back').src = back.src;
+    zoomSheet.classList.remove('flipped');
+    zoomSheet.setAttribute('aria-label', `${s.getAttribute('aria-label').split(' ')[0]} 지면, 누르면 뒷면`);
+    zoom.hidden = false;
+    zoomSheet.focus();
+  });
+  zoom.addEventListener('click', e => {
+    if (e.target.closest('.sheet')) zoomSheet.classList.toggle('flipped');
+    else zoom.hidden = true;
+  });
+  addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!zoom.hidden) zoom.hidden = true;
+    else if (location.hash === '#result') location.hash = '';
+  });
 
   // 띠 자동 흐름: 천천히 왼쪽으로. 마우스 올리면/만지면 멈춤. 30장 끝나면 복제본 덕에 1일차로 이어짐
   const FLOW_PX_PER_SEC = 30;
@@ -137,7 +174,7 @@
     flowLast = t;
     if (flowOn && location.hash === '#result') {
       if (Math.abs(sheets.scrollLeft - flowPos) > 2) flowPos = sheets.scrollLeft; // 손으로 넘긴 위치 따라감
-      if (!flowPaused) flowPos += FLOW_PX_PER_SEC * dt;
+      if (!flowPaused && zoom.hidden) flowPos += FLOW_PX_PER_SEC * dt;
       const loop = loopWidth();
       if (flowPos >= loop) flowPos -= loop;
       if (flowPos < 0) flowPos += loop;
@@ -166,6 +203,7 @@
   }
 
   addEventListener('wheel', e => {
+    if (!zoom.hidden) { e.preventDefault(); return; } // 크게 보기 중엔 뒤 배경 안 움직임
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
