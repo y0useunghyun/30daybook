@@ -29,22 +29,25 @@
   @keyframes redraw { from { stroke-dashoffset: 1; } }
   .mark:focus-visible { outline: none; }
   @media (prefers-reduced-motion: reduce) { .mark path { animation: none !important; } }
-  /* 30일치 지면: 주소가 #result일 때만 보임. ponytail: 엮는 방식 정해지기 전 임시 격자 */
+  /* 30일치 지면: 주소가 #result일 때 배경 위, 화면 가운데 1/3 띠에 한 줄로. 윗선 맞춤, 옆으로 넘겨 봄 */
   .sheets {
-    display: none; position: fixed; inset: 0; z-index: 8;
-    overflow-y: auto; background: #fff;
-    padding: 176px 24px 48px;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 32px 24px; align-items: start;
+    --band: 33.333vh;
+    display: none; position: fixed; left: 0; right: 0; top: var(--band); height: var(--band); z-index: 8;
+    overflow-x: auto; overflow-y: hidden; overscroll-behavior: contain;
+    padding: 0 24px; gap: 24px; align-items: flex-start;
+    scrollbar-width: none;
   }
-  .sheets:target { display: grid; }
+  .sheets::-webkit-scrollbar { display: none; }
+  .sheets:target { display: flex; }
+  .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */
   .sheet {
-    position: relative; padding: 0; border: 0; background: none; cursor: pointer;
+    position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer;
     transform-style: preserve-3d; transition: transform .6s ease;
   }
   .sheet.flipped { transform: rotateY(180deg); }
-  .sheet img { display: block; width: 100%; backface-visibility: hidden; }
-  .sheet .back { position: absolute; inset: 0; height: 100%; object-fit: contain; transform: rotateY(180deg); }
+  /* 높이 = 원본 스캔 높이 비율 × 띠 높이 (가장 큰 지면이 띠에 꽉) → 종이 실제 크기 차이 유지 */
+  .sheet img { display: block; width: auto; height: calc(var(--h) * var(--band)); backface-visibility: hidden; }
+  .sheet .back { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
 
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
@@ -58,7 +61,7 @@
     margin: -72px 0 0 -138px;
   }
 
-  /* 캐릭터: 마우스를 늦게 따라옴. 5초간 안 움직이면 c2(화남) */
+  /* 캐릭터: 마우스를 늦게 따라옴. 평소 c2(웃음), 5초간 안 움직이면 c1(화남) */
   .buddy {
     position: fixed; top: 0; left: 0; z-index: 10;
     width: 100px; height: 90px; overflow: hidden;
@@ -69,8 +72,8 @@
   /* c1·c2는 캔버스 안 그림 위치가 달라서 각각 맞춤 */
   .buddy .c1 { margin: -82px 0 0 -134px; }
   .buddy .c2 { margin: -67px 0 0 -124px; }
-  .buddy .c1, .buddy.angry .c2 { display: block; }
-  .buddy.angry .c1 { display: none; }
+  .buddy .c2, .buddy.angry .c1 { display: block; }
+  .buddy.angry .c2 { display: none; }
   @media not (pointer: fine) { .buddy { display: none; } }
 </style>
 </head>
@@ -94,13 +97,15 @@
   document.querySelectorAll('.mark').forEach(a => a.insertAdjacentHTML('beforeend', LOOP));
 
   // 결과물: 앞면 30장 (pages/front·back/day01~30.jpg)
-  const DAYS = 30;
+  // 원본 스캔 크기 [w, h] — 웹용은 줄여서 실제 크기 비율이 없어 여기서 씀
+  const SCAN = [[1627,1548],[1639,1764],[1656,1924],[1650,1548],[1629,1228],[1691,1316],[1704,1796],[1653,1688],[1639,1556],[1623,1168],[1602,1152],[1653,1616],[1629,1404],[1616,1412],[1619,1124],[1616,1408],[1619,1332],[1616,1264],[1639,1496],[1639,1288],[1626,1140],[1632,1496],[1646,1388],[1619,940],[1639,980],[1605,1372],[1612,1636],[1616,1608],[1670,680],[1707,1072]];
+  const SCAN_MAX_H = Math.max(...SCAN.map(([, h]) => h));
   const pad = n => String(n).padStart(2, '0');
   const sheets = document.getElementById('result');
-  sheets.innerHTML = Array.from({ length: DAYS }, (_, i) => {
+  sheets.innerHTML = SCAN.map(([w, h], i) => {
     const d = pad(i + 1);
     return `<button class="sheet" type="button" aria-label="${i + 1}일차 지면 (누르면 뒷면)">
-      <img src="pages/front/day${d}.jpg" alt="" loading="lazy">
+      <img src="pages/front/day${d}.jpg" alt="" loading="lazy" width="${w}" height="${h}" style="--h:${h / SCAN_MAX_H}">
       <img class="back" src="pages/back/day${d}.jpg" alt="" loading="lazy">
     </button>`;
   }).join('');
@@ -127,7 +132,11 @@
   }
 
   addEventListener('wheel', e => {
-    if (location.hash === '#result') return; // 지면 목록은 그냥 스크롤
+    if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
+      e.preventDefault();
+      sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      return;
+    }
     e.preventDefault();
     zoomAt(view.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), e.clientX, e.clientY);
   }, { passive: false });
