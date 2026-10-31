@@ -234,15 +234,23 @@
     if (e.target.closest('.sheet') && zoom.dataset.mode === 'flip') zoomSheet.classList.toggle('flipped');
     else zoom.hidden = true;
   });
-  // 결과물·복잡이 열린 상태에서 바깥(배경)을 누르면 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
+  // 열린 화면에서 바깥(배경)을 누르면 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
+  // click 대신 pointerup: 아이폰 사파리는 빈 영역 탭에 click을 안 보내서 모바일에서 안 닫혔음
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
+  const SWALLOW_CLICK_MS = 400;
   const isOpen = () => ['#result', '#mess', '#count'].includes(location.hash);
   let downAt = null;
-  addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY });
-  addEventListener('click', e => {
-    const moved = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > TAP_SLOP_PX;
-    if (moved || !isOpen() || !zoom.hidden) return;
-    if (e.target.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo, .side')) return;
+  addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
+  addEventListener('pointerup', e => {
+    const tap = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) <= TAP_SLOP_PX;
+    const target = downAt?.target; // 캡처 중이면 e.target이 바뀌어서 누른 곳 기준
+    downAt = null;
+    if (!tap || !isOpen() || !zoom.hidden) return;
+    if (target?.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo, .side')) return;
+    // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게 한 번 삼킴
+    const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
+    addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => removeEventListener('click', swallow, { capture: true }), SWALLOW_CLICK_MS);
     close(e.clientX, e.clientY);
   });
   addEventListener('keydown', e => {
