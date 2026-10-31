@@ -73,13 +73,14 @@
   .game:focus { outline: none; }
   .game-card { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 16px; }
   .game-card img { display: block; max-width: 70vw; max-height: 48vh; box-shadow: var(--paper-shadow); }
-  /* 입력: 밑줄 한 줄 + Enter. UP/DOWN·정답도 같은 칸에 (지워진 자리에 안내 글자로) */
-  .game form { padding: 10px 18px; background: #fff; /* 배경 사진 글자와 안 겹치게 */ }
+  /* 입력: 연한 밑줄 한 줄 + Enter. UP/DOWN·결과도 같은 칸에 (지워진 자리에 안내 글자로). 폭은 JS가 글자에 맞춤 */
+  .game form { padding: 8px 14px; background: #fff; /* 배경 사진 글자와 안 겹치게 */ }
   .game input {
-    display: block; width: 13.5em; /* 가장 긴 문구 「정답! 704자였습니다.」가 들어가는 만큼 */ padding: 2px; border: 0; border-bottom: 1.5px solid #000; border-radius: 0;
+    display: block; width: 6em; padding: 2px 4px; border: 0; border-bottom: 1px solid #ddd; border-radius: 0;
     background: transparent; font: inherit; font-size: 18px; color: #000; text-align: center;
     -moz-appearance: textfield;
   }
+  .game input.said { caret-color: transparent; } /* UP/DOWN·결과 떠 있을 땐 커서 숨김, 치기 시작하면 다시 */
   .game input::-webkit-inner-spin-button, .game input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .game input:focus { outline: none; }
   .game input::placeholder { color: #aaa; }
@@ -318,7 +319,18 @@
     guessInput.placeholder = msg;
     guessInput.classList.toggle('said', strong);
     gameHint.textContent = msg;
+    fitInput();
   };
+  // 칸 폭 = 지금 보이는 글자(입력값 또는 안내) 폭 + 약간
+  const INPUT_MIN_PX = 48, INPUT_PAD_PX = 16;
+  const measure = document.createElement('canvas').getContext('2d');
+  function fitInput() {
+    measure.font = getComputedStyle(guessInput).font;
+    const w = measure.measureText(guessInput.value || guessInput.placeholder).width;
+    guessInput.style.width = `${Math.max(INPUT_MIN_PX, Math.ceil(w) + INPUT_PAD_PX)}px`;
+  }
+  guessInput.addEventListener('input', () => { guessInput.classList.remove('said'); fitInput(); });
+  document.fonts.ready.then(fitInput); // SUIT 늦게 오면 다시 맞춤
   const NEXT_ROUND_MS = 2000; // 결과 보여주고 다음 종이로 넘어가기까지
   let nextTimer;
   function newRound() {
