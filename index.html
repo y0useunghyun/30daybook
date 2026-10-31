@@ -101,18 +101,50 @@
   // 결과물: 앞면 30장 (pages/front·back/day01~30.jpg)
   // 원본 스캔 크기 [w, h] — 웹용은 줄여서 실제 크기 비율이 없어 여기서 씀
   const SCAN = [[1627,1548],[1639,1764],[1656,1924],[1650,1548],[1629,1228],[1691,1316],[1704,1796],[1653,1688],[1639,1556],[1623,1168],[1602,1152],[1653,1616],[1629,1404],[1616,1412],[1619,1124],[1616,1408],[1619,1332],[1616,1264],[1639,1496],[1639,1288],[1626,1140],[1632,1496],[1646,1388],[1619,940],[1639,980],[1605,1372],[1612,1636],[1616,1608],[1670,680],[1707,1072]];
+  const DAYS = SCAN.length;
   const SCAN_MAX_W = Math.max(...SCAN.map(([w]) => w));
   const pad = n => String(n).padStart(2, '0');
   const sheets = document.getElementById('result');
-  sheets.innerHTML = SCAN.map(([w, h], i) => {
-    const d = pad(i + 1);
-    return `<button class="sheet" type="button" aria-label="${i + 1}일차 지면 (누르면 뒷면)">
+  // 끊김 없이 돌도록 30장을 한 벌 더 붙임 (복제본은 스크린리더에서 숨김)
+  sheets.innerHTML = [...SCAN, ...SCAN].map(([w, h], j) => {
+    const i = j % DAYS, d = pad(i + 1), copy = j >= DAYS;
+    return `<button class="sheet" type="button" aria-label="${i + 1}일차 지면 (누르면 뒷면)"${copy ? ' aria-hidden="true" tabindex="-1"' : ''}>
       <img src="pages/front/day${d}.jpg" alt="" loading="lazy" width="${w}" height="${h}" style="--w:${w / SCAN_MAX_W}">
       <img class="back" src="pages/back/day${d}.jpg" alt="" loading="lazy">
     </button>`;
   }).join('');
   sheets.addEventListener('click', e => e.target.closest('.sheet')?.classList.toggle('flipped'));
   addEventListener('keydown', e => { if (e.key === 'Escape' && location.hash === '#result') location.hash = ''; });
+
+  // 띠 자동 흐름: 천천히 왼쪽으로. 마우스 올리면/만지면 멈춤. 30장 끝나면 복제본 덕에 1일차로 이어짐
+  const FLOW_PX_PER_SEC = 30;
+  const RESUME_AFTER_TOUCH_MS = 3000;
+  const flowOn = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let flowPos = 0, flowPaused = false, flowLast = 0, resumeTimer;
+  const loopWidth = () => sheets.children[DAYS].offsetLeft - sheets.children[0].offsetLeft;
+  sheets.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') flowPaused = true; });
+  sheets.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') flowPaused = false; });
+  sheets.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    flowPaused = true; clearTimeout(resumeTimer);
+  });
+  sheets.addEventListener('pointerup', e => {
+    if (e.pointerType === 'mouse') return;
+    resumeTimer = setTimeout(() => flowPaused = false, RESUME_AFTER_TOUCH_MS);
+  });
+  (function flow(t) {
+    const dt = flowLast ? (t - flowLast) / 1000 : 0;
+    flowLast = t;
+    if (flowOn && location.hash === '#result') {
+      if (Math.abs(sheets.scrollLeft - flowPos) > 2) flowPos = sheets.scrollLeft; // 손으로 넘긴 위치 따라감
+      if (!flowPaused) flowPos += FLOW_PX_PER_SEC * dt;
+      const loop = loopWidth();
+      if (flowPos >= loop) flowPos -= loop;
+      if (flowPos < 0) flowPos += loop;
+      sheets.scrollLeft = flowPos;
+    }
+    requestAnimationFrame(flow);
+  })(0);
 
   // 배경 확대·축소: 휠/트랙패드 핀치, 폰 두 손가락, 드래그로 이동, 더블클릭으로 원래대로
   const page = document.querySelector('.page');
