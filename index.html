@@ -67,7 +67,7 @@
   }
   .paper.dragging { cursor: grabbing; }
 
-  /* 계산 가능: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
+  /* 계산: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
   .game { display: none; position: fixed; inset: 0; z-index: 8; place-items: center; }
   .game:target { display: grid; }
   .game:focus { outline: none; }
@@ -142,9 +142,9 @@
     <img src="main/main_02.png" alt="클립으로 묶은 원문 지면과 사견 묶음">
     <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
     <a class="mark" href="#mess" aria-label="복잡 — 모든 종이 쏟기" style="left:67.8%; top:32.3%; width:4.6%; height:3.4%"></a>
-    <a class="mark" href="#count" aria-label="계산 가능 — 글자수 맞히기" style="left:38.2%; top:48.4%; width:7.4%; height:3.6%"></a>
+    <a class="mark" href="#count" aria-label="계산 — 글자수 맞히기" style="left:38.7%; top:48.3%; width:3.9%; height:3.4%"></a>
   </main>
-  <!-- 계산 가능: 아무 앞면 한 장의 글자수 맞히기. 기회 3번, 업/다운 -->
+  <!-- 계산: 아무 앞면 한 장의 글자수 맞히기. 기회 3번, 업/다운 -->
   <section id="count" class="game" aria-label="글자수 맞히기">
     <div class="game-card">
       <img alt="">
@@ -300,7 +300,7 @@
   }
 
 
-  // 계산 가능: 아무 앞면 한 장 → 글자수 맞히기 (기회 3번, 업/다운)
+  // 계산: 아무 앞면 한 장 → 글자수 맞히기 (기회 3번, 업/다운)
   // 글자수 = macOS Vision OCR로 센 종이 전체 글자 (공백 제외, 맨 위 책 제목·쪽수 줄 포함)
   const CHAR_COUNTS = [508,643,704,528,392,378,591,596,524,349,359,577,483,426,320,444,405,462,503,442,381,576,515,277,339,473,581,598,199,326];
   const GUESS_TRIES = 3;
