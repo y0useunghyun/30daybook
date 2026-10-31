@@ -115,8 +115,22 @@
   .logo {
     position: fixed; top: 24px; left: 24px;
     width: 128px; height: 136px; overflow: hidden;
-    mix-blend-mode: multiply; z-index: 9; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록 위에도 떠서 홈 버튼 역할 */
+    mix-blend-mode: multiply; z-index: 10; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록·사이드탭 위에도 떠서 홈 버튼 역할 */
   }
+
+  /* 사이드탭: 로고에 마우스 올리면 왼쪽에서 나옴 (로고 클릭=홈은 그대로). 마우스 있는 기기만 */
+  .side {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 9; width: 200px;
+    padding: 184px 28px 24px; box-sizing: border-box;
+    background: #fff; box-shadow: var(--paper-shadow);
+    transform: translateX(-100%); transition: transform .2s ease;
+  }
+  .side a { display: block; padding: 6px 0; color: #000; text-decoration: none; font-size: 18px; }
+  .side a:hover, .side a:focus-visible { text-decoration: underline; text-underline-offset: 4px; outline: none; }
+  @media (hover: hover) {
+    .logo:hover ~ .side, .side:hover, .side:focus-within { transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
   .logo img {
     width: 421px; /* 원본의 50% */
     margin: -72px 0 0 -138px;
@@ -124,7 +138,7 @@
 
   /* 캐릭터: 마우스를 늦게 따라옴. 평소 c2(웃음), 5초간 안 움직이면 c1(화남) */
   .buddy {
-    position: fixed; top: 0; left: 0; z-index: 10;
+    position: fixed; top: 0; left: 0; z-index: 11;
     width: 100px; height: 90px; overflow: hidden;
     pointer-events: none; mix-blend-mode: multiply; /* PNG가 흰 배경이라 겹칠 때 흰 박스 안 보이게 */
     visibility: hidden;
@@ -165,6 +179,11 @@
     </button>
   </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
+  <nav class="side" aria-label="바로가기">
+    <a href="#result">결과물</a>
+    <a href="#mess">복잡</a>
+    <a href="#count">계산</a>
+  </nav>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
     <img class="c2" src="c2.png" alt="">
@@ -223,7 +242,7 @@
   addEventListener('click', e => {
     const moved = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > TAP_SLOP_PX;
     if (moved || !isOpen() || !zoom.hidden) return;
-    if (e.target.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo')) return;
+    if (e.target.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo, .side')) return;
     close(e.clientX, e.clientY);
   });
   addEventListener('keydown', e => {
@@ -297,7 +316,7 @@
         { duration: SCATTER_MS, delay: d / far * SCATTER_SPREAD_MS, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' }
       ).finished;
     });
-    Promise.all(runs).then(() => { if (scattering) location.hash = ''; }, () => {}); // 중간에 취소되면 무시
+    Promise.all(runs).then(() => { if (scattering && location.hash === '#mess') location.hash = ''; }, () => {}); // 중간에 취소되면 무시
   }
 
 
