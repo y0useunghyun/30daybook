@@ -118,22 +118,15 @@
     mix-blend-mode: multiply; z-index: 10; /* 흰 배경 PNG라 사진 위에서 흰 네모 안 보이게. 지면 목록·사이드탭 위에도 떠서 홈 버튼 역할 */
   }
 
-  /* 사이드탭: 로고 위에 잠깐 머물면 왼쪽에서 나옴 (그냥 누르면 홈). 여닫기는 JS가 .open으로 */
+  /* 로고 메뉴: 로고 위에 잠깐 머물면 바로 밑에 INFO·BOOK 두 줄만 나타남 (그냥 누르면 홈). JS가 .open */
   .side {
-    position: fixed; left: 0; top: 0; bottom: 0; z-index: 9; width: 260px;
-    padding: 184px 28px 24px; box-sizing: border-box; overflow-y: auto;
-    background: #fff; box-shadow: var(--paper-shadow);
-    transform: translateX(-100%); transition: transform .2s ease;
+    position: fixed; left: 24px; top: 160px; z-index: 10;
+    padding: 6px 4px 12px; /* 로고 아래와 맞붙여서 마우스 옮길 때 안 끊기게 */
+    display: none;
   }
-  .side.open { transform: none; }
-  .side h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: #888; }
-  .side section + section { margin-top: 32px; }
-  .side ul { margin: 0; padding: 0; list-style: none; }
-  .side li { padding: 4px 0; font-size: 16px; }
-  .side p { margin: 0; font-size: 15px; line-height: 1.6; }
-  .side p:empty { display: none; }
-  .side section:has(p:empty) { display: none; } /* 소개 글 넣기 전엔 숨김 */
-  @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
+  .side.open { display: block; }
+  .side a { display: block; padding: 3px 0; color: #000; text-decoration: none; font-size: 15px; letter-spacing: .04em; }
+  .side a:hover, .side a:focus-visible { text-decoration: underline; text-underline-offset: 4px; outline: none; }
   .logo img {
     width: 421px; /* 원본의 50% */
     margin: -72px 0 0 -138px;
@@ -182,23 +175,11 @@
     </button>
   </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
-  <aside class="side" aria-label="소개와 읽은 책">
-    <section>
-      <h2>소개</h2>
-      <p><!-- 소개 글 자리 (비어 있으면 섹션 숨김) --></p>
-    </section>
-    <section>
-      <h2>읽은 책</h2>
-      <!-- ponytail: 표지 이미지 받으면 각 li에 <img> 추가 -->
-      <ul>
-        <li>전술적 출판</li>
-        <li>디자이너란 무엇인가</li>
-        <li>멀티플 시그니처</li>
-        <li>타이포그래피 에세이</li>
-        <li>책의 여백에서</li>
-      </ul>
-    </section>
-  </aside>
+  <nav class="side" aria-label="메뉴">
+    <!-- ponytail: 내용 아직 없음. INFO·BOOK 화면 생기면 연결 -->
+    <a href="#info">INFO</a>
+    <a href="#book">BOOK</a>
+  </nav>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
     <img class="c2" src="c2.png" alt="">
@@ -578,7 +559,7 @@
   page.addEventListener('pointercancel', release);
   page.addEventListener('dblclick', () => { view = { s: 1, x: 0, y: 0 }; render(); });
 
-  // 사이드탭: 로고 위에 SIDE_OPEN_DELAY_MS 머물러야 열림 → 그냥 눌러 새로고침할 땐 안 열림.
+  // 로고 메뉴: 로고 위에 SIDE_OPEN_DELAY_MS 머물러야 열림 → 그냥 눌러 새로고침할 땐 안 열림.
   // 새로고침 직후 마우스가 이미 로고 위면, 로고 밖으로 한 번 나가야 다시 열 수 있음
   const side = document.querySelector('.side');
   const logo = document.querySelector('.logo');
