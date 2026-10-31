@@ -64,23 +64,31 @@
   }
   .paper.dragging { cursor: grabbing; }
 
-  /* 시뮬레이션: 30장(앞·뒤 붙인 종이)이 아주 넓은 3D 공간에 떠 있음. 끌면 공간이 돌고, 휠로 앞뒤 이동 */
-  .sim {
-    --paper3d-w: clamp(140px, 14vw, 240px);
-    display: none; position: fixed; inset: 0; z-index: 8; overflow: hidden;
-    perspective: 1000px; cursor: grab; touch-action: none;
+  /* 계산 가능: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
+  .game { display: none; position: fixed; inset: 0; z-index: 8; place-items: center; }
+  .game:target { display: grid; }
+  .game:focus { outline: none; }
+  .game-card { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 16px; }
+  .game-card img { display: block; max-width: 80vw; max-height: 62vh; box-shadow: var(--paper-shadow); }
+  .game form {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    font: 15px/1.4 system-ui, sans-serif; color: #000;
+    padding: 14px 22px; background: #fff; box-shadow: var(--paper-shadow); /* 배경 사진 글자와 안 겹치게 흰 쪽지 */
   }
-  .sim:target { display: block; }
-  .sim:focus { outline: none; }
-  .sim.dragging { cursor: grabbing; }
-  .sim .world { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
-  .paper3d { position: absolute; transform-style: preserve-3d; cursor: pointer; }
-  .paper3d img {
-    display: block; width: calc(var(--w) * var(--paper3d-w)); height: auto;
-    backface-visibility: hidden; box-shadow: var(--paper-shadow);
-    user-select: none; -webkit-user-drag: none;
+  .game small { color: #666; }
+  .game-row { display: flex; gap: 8px; align-items: baseline; }
+  .game input {
+    width: 6em; padding: 4px 2px; border: 0; border-bottom: 2px solid #000;
+    background: transparent; font: inherit; font-size: 20px; text-align: center;
   }
-  .paper3d .back { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotateY(180deg); }
+  .game input:focus { outline: none; border-bottom-color: #000; }
+  .game button {
+    padding: 4px 10px; border: 2px solid #000; border-radius: 999px;
+    background: #fff; font: inherit; cursor: pointer;
+  }
+  .game button:hover, .game button:focus-visible { background: #000; color: #fff; outline: none; }
+  .game-hint { margin: 0; min-height: 1.4em; font-size: 17px; }
+
 
   .sheet {
     position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer;
@@ -137,10 +145,23 @@
     <img src="main/main_02.png" alt="클립으로 묶은 원문 지면과 사견 묶음">
     <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
     <a class="mark" href="#mess" aria-label="복잡 — 모든 종이 쏟기" style="left:67.8%; top:32.3%; width:4.6%; height:3.4%"></a>
-    <a class="mark" href="#sim" aria-label="시뮬레이션 — 종이들이 떠 있는 3D 공간" style="left:64.8%; top:42.6%; width:8.4%; height:3.6%"></a>
+    <a class="mark" href="#count" aria-label="계산 가능 — 글자수 맞히기" style="left:37%; top:48.8%; width:6.6%; height:3.6%"></a>
   </main>
-  <!-- 시뮬레이션: 3D 공간에 30장. 끌어서 돌리기, 휠로 앞뒤, 누르면 크게 -->
-  <section id="sim" class="sim" aria-label="3D 공간의 지면들"><div class="world"></div></section>
+  <!-- 계산 가능: 아무 앞면 한 장의 글자수 맞히기. 기회 3번, 업/다운 -->
+  <section id="count" class="game" aria-label="글자수 맞히기">
+    <div class="game-card">
+      <img alt="">
+      <form>
+        <label for="guess">이 종이는 몇 글자일까 <small>(띄어쓰기 빼고)</small></label>
+        <div class="game-row">
+          <input id="guess" type="number" inputmode="numeric" min="1" max="9999" required autocomplete="off">
+          <button type="submit">확인</button>
+        </div>
+        <p class="game-hint" aria-live="polite"></p>
+        <button class="game-again" type="button" hidden>다른 종이</button>
+      </form>
+    </div>
+  </section>
   <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
   <section id="mess" class="mess" aria-label="모든 종이"></section>
   <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
@@ -203,13 +224,13 @@
   });
   // 결과물·복잡이 열린 상태에서 바깥(배경)을 누르면 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
-  const isOpen = () => ['#result', '#mess', '#sim'].includes(location.hash);
+  const isOpen = () => ['#result', '#mess', '#count'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY });
   addEventListener('click', e => {
     const moved = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > TAP_SLOP_PX;
     if (moved || !isOpen() || !zoom.hidden) return;
-    if (e.target.closest('.sheets, .paper, .paper3d, .zoom, .mark, .logo')) return;
+    if (e.target.closest('.sheets, .paper, .game-card, .zoom, .mark, .logo')) return;
     close(e.clientX, e.clientY);
   });
   addEventListener('keydown', e => {
@@ -286,74 +307,51 @@
     Promise.all(runs).then(() => { if (scattering) location.hash = ''; }, () => {}); // 중간에 취소되면 무시
   }
 
-  // 시뮬레이션: 30장을 넓은 3D 공간에 랜덤 배치 (x·y·z 위치 + x·y·z 회전). 열 때마다 새로
-  const sim = document.getElementById('sim');
-  const world = sim.querySelector('.world');
-  const SIM_SPREAD = { x: 1.4, y: 1.1, z: 2200 }; // x·y는 화면 크기 배수, z는 px (±)
-  const SIM_SPIN_DEG_PER_SEC = 3;
-  const SIM_DOLLY = { min: -2500, max: 1200 };
-  const simSpinOn = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let cam = { ax: -8, ay: 0, z: -400 }, simDrag = null, simLast = 0;
-  const papers3d = SCAN.map(([w, h], i) => {
-    const el = document.createElement('div');
-    el.className = 'paper3d';
-    el.setAttribute('aria-label', `${i + 1}일차 지면`);
-    el.dataset.day = pad(i + 1);
-    el.innerHTML = `<img alt="" width="${w}" height="${h}" style="--w:${w / SCAN_MAX_W}">` +
-      `<img class="back" alt="">`;
-    world.append(el);
-    return el;
-  });
-  function scatter3d() {
-    papers3d.forEach(el => {
-      const [front, back] = el.querySelectorAll('img');
-      if (!front.src) { front.src = `pages/small/front${el.dataset.day}.jpg`; back.src = `pages/small/back${el.dataset.day}.jpg`; }
-      const x = rand(-.5, .5) * innerWidth * SIM_SPREAD.x, y = rand(-.5, .5) * innerHeight * SIM_SPREAD.y, z = rand(-1, 1) * SIM_SPREAD.z;
-      el.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) ` +
-        `rotateX(${rand(-70, 70)}deg) rotateY(${rand(-180, 180)}deg) rotateZ(${rand(-45, 45)}deg)`;
-    });
-    cam = { ax: -8, ay: 0, z: -400 };
+
+  // 계산 가능: 아무 앞면 한 장 → 글자수 맞히기 (기회 3번, 업/다운)
+  // 글자수 = macOS Vision OCR로 센 공백 제외 글자 (제목 줄 포함)
+  const CHAR_COUNTS = [508,643,704,528,392,378,591,596,524,349,359,577,483,426,320,444,405,462,503,442,381,576,515,277,339,473,581,598,199,326];
+  const GUESS_TRIES = 3;
+  const GUESS_TOLERANCE = 5; // ponytail: OCR이 몇 자 틀릴 수 있어 ±5는 정답 처리. 직접 센 값 생기면 0으로
+  const game = document.getElementById('count');
+  const gameImg = game.querySelector('img');
+  const gameForm = game.querySelector('form');
+  const guessInput = game.querySelector('input');
+  const gameHint = game.querySelector('.game-hint');
+  const gameAgain = game.querySelector('.game-again');
+  let round = null; // { day, answer, left }
+  function newRound() {
+    const day = Math.floor(Math.random() * DAYS);
+    round = { day, answer: CHAR_COUNTS[day], left: GUESS_TRIES };
+    gameImg.src = `pages/front/day${pad(day + 1)}.jpg`;
+    gameImg.alt = `${day + 1}일차 지면`;
+    gameHint.textContent = `기회 ${GUESS_TRIES}번`;
+    guessInput.value = '';
+    guessInput.disabled = gameForm.querySelector('[type=submit]').disabled = false;
+    gameAgain.hidden = true;
+    guessInput.focus({ preventScroll: true });
   }
-  const renderCam = () => world.style.transform = `translateZ(${cam.z}px) rotateX(${cam.ax}deg) rotateY(${cam.ay}deg)`;
-  (function spin(t) {
-    const dt = simLast ? (t - simLast) / 1000 : 0;
-    simLast = t;
-    if (location.hash === '#sim') {
-      if (!simDrag && zoom.hidden && simSpinOn) cam = { ...cam, ay: cam.ay + SIM_SPIN_DEG_PER_SEC * dt };
-      renderCam();
-    }
-    requestAnimationFrame(spin);
-  })(0);
-  // 끌면 공간 회전, 안 움직이고 종이 놓으면 크게 보기
-  sim.addEventListener('pointerdown', e => {
-    simDrag = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false };
-    sim.setPointerCapture(e.pointerId);
+  function endRound(msg) {
+    gameHint.textContent = msg;
+    guessInput.disabled = gameForm.querySelector('[type=submit]').disabled = true;
+    gameAgain.hidden = false;
+    gameAgain.focus();
+  }
+  gameForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const guess = Number(guessInput.value);
+    if (!round || !Number.isInteger(guess) || guess < 1) return;
+    round = { ...round, left: round.left - 1 };
+    if (Math.abs(guess - round.answer) <= GUESS_TOLERANCE) return endRound(`정답! ${round.answer}자`);
+    if (!round.left) return endRound(`아쉽다, ${round.answer}자였어`);
+    gameHint.textContent = `${guess < round.answer ? '업 ↑' : '다운 ↓'}  ·  남은 기회 ${round.left}번`;
+    guessInput.select();
   });
-  sim.addEventListener('pointermove', e => {
-    if (!simDrag) return;
-    if (!simDrag.moved && Math.hypot(e.clientX - simDrag.startX, e.clientY - simDrag.startY) <= TAP_SLOP_PX) return;
-    simDrag.moved = true;
-    sim.classList.add('dragging');
-    cam = { ...cam, ay: cam.ay + (e.clientX - simDrag.x) * .2, ax: clamp(cam.ax - (e.clientY - simDrag.y) * .2, -80, 80) };
-    simDrag = { ...simDrag, x: e.clientX, y: e.clientY };
-  });
-  const endSimDrag = e => {
-    if (!simDrag) return;
-    const { moved } = simDrag;
-    simDrag = null;
-    sim.classList.remove('dragging');
-    if (moved || e.type !== 'pointerup') return;
-    // 캡처 중이라 e.target이 sim이므로, 놓은 지점의 종이를 직접 찾음
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.paper3d');
-    if (el) openZoom('flip', `pages/front/day${el.dataset.day}.jpg`, `pages/back/day${el.dataset.day}.jpg`, `${el.getAttribute('aria-label')}, 누르면 뒷면`);
-    // 빈 곳은 아래 공통 click 핸들러가 닫음
-  };
-  sim.addEventListener('pointerup', endSimDrag);
-  sim.addEventListener('pointercancel', endSimDrag);
+  gameAgain.addEventListener('click', newRound);
 
   const onHash = () => {
     if (location.hash === '#mess') dropPapers();
-    if (location.hash === '#sim') scatter3d();
+    if (location.hash === '#count') newRound();
   };
   addEventListener('hashchange', onHash);
   onHash();
@@ -474,13 +472,8 @@
   }
 
   addEventListener('wheel', e => {
-    // 크게 보기·복잡 중엔 뒤 배경 안 움직임
-    if (!zoom.hidden || location.hash === '#mess') { e.preventDefault(); return; }
-    if (location.hash === '#sim') { // 시뮬레이션: 휠로 공간 앞뒤 이동
-      e.preventDefault();
-      cam = { ...cam, z: clamp(cam.z - e.deltaY, SIM_DOLLY.min, SIM_DOLLY.max) };
-      return;
-    }
+    // 크게 보기·복잡·글자수 게임 중엔 뒤 배경 안 움직임
+    if (!zoom.hidden || location.hash === '#mess' || location.hash === '#count') { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
