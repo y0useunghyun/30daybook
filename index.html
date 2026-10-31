@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>30 DAYS</title>
 <style>
+  /* 워크숍 사이트와 같은 SUIT (OFL, fonts/OFL.txt) */
+  @font-face { font-family: "SUIT"; src: url(fonts/SUIT-Medium.woff2) format("woff2"); font-weight: 500; font-display: swap; }
   html, body { margin: 0; background: #fff; }
+  body { font-family: "SUIT", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-weight: 500; letter-spacing: -.01em; }
   /* 배경: 원본 묶음(세로로 세운 누끼)을 화면 안에서 최대 크기로 */
   .page {
     position: fixed; top: 50%; left: 50%;
@@ -73,7 +76,7 @@
   /* 입력: 밑줄 한 줄 + Enter. 결과는 그 아래 한 줄 */
   .game form {
     display: flex; flex-direction: column; align-items: center; gap: 6px;
-    font: 17px/1.4 system-ui, sans-serif; color: #000;
+    font-size: 17px; line-height: 1.4; color: #000;
     padding: 10px 18px; background: #fff; /* 배경 사진 글자와 안 겹치게 */
   }
   .game input {
@@ -336,7 +339,7 @@
     round = { ...round, left: round.left - 1 };
     if (Math.abs(guess - round.answer) <= GUESS_TOLERANCE) return endRound(`정답! ${round.answer}자`);
     if (!round.left) return endRound(`${round.answer}자였어`);
-    gameHint.textContent = `${guess < round.answer ? '업' : '다운'} · ${round.left}번 남음`;
+    gameHint.textContent = `${guess < round.answer ? 'UP' : 'DOWN'} · ${round.left}번 남음`;
     guessInput.select();
   });
 
