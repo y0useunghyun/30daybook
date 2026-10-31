@@ -13,6 +13,9 @@
     touch-action: none; cursor: grab;
   }
   .page.dragging { cursor: grabbing; }
+  .page { transition: opacity .4s ease; }
+  /* 결과물 띠가 열리면 뒤 배경을 살짝 죽임 */
+  body:has(#result:target) .page { opacity: .35; }
   .page > img { display: block; max-width: 92vw; max-height: 92vh; user-select: none; -webkit-user-drag: none; }
 
   /* 단어 링크: 로고처럼 마커로 그린 동그라미. 위치는 사진 기준 % */
@@ -40,7 +43,10 @@
     scrollbar-width: none;
   }
   .sheets::-webkit-scrollbar { display: none; }
-  .sheets:target { display: flex; }
+  .sheets:target { display: flex; cursor: grab; }
+  .sheets.dragging { cursor: grabbing; }
+  .sheets .sheet { cursor: inherit; }
+  .sheets img { user-select: none; -webkit-user-drag: none; }
   .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */  .sheet {
     position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer;
     transform-style: preserve-3d; transition: transform .6s ease;
@@ -131,7 +137,9 @@
   // 띠에서 누르면 크게 보기
   const zoom = document.querySelector('.zoom');
   const zoomSheet = zoom.querySelector('.sheet');
+  let bandDragged = false; // 띠를 끌어 민 직후의 click은 크게 보기로 안 침
   sheets.addEventListener('click', e => {
+    if (bandDragged) { bandDragged = false; return; }
     const s = e.target.closest('.sheet');
     if (!s) return;
     const [front, back] = s.querySelectorAll('img');
@@ -147,7 +155,7 @@
     else zoom.hidden = true;
   });
   // 띠 바깥(배경)을 누르면 띠 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
-  const TAP_SLOP_PX = 6;
+  const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY });
   addEventListener('click', e => {
@@ -178,12 +186,50 @@
     if (e.pointerType === 'mouse') return;
     resumeTimer = setTimeout(() => flowPaused = false, RESUME_AFTER_TOUCH_MS);
   });
+  // 마우스로 띠 잡고 좌우로 밀기. 놓으면 민 속도로 미끄러지다 멈춤 (폰은 기본 스크롤로 밀림)
+  const FLING_DECAY_PER_SEC = 0.05; // 1초 뒤 남는 속도 비율
+  const FLING_MAX_PX_PER_SEC = 2500;
+  const FLING_HOLD_MS = 100; // 놓기 전 이만큼 멈춰 있었으면 미끄러짐 없음
+  let drag = null, fling = 0;
+  sheets.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag = { startX: e.clientX, lastX: e.clientX, lastT: e.timeStamp, v: 0 };
+    fling = 0;
+  });
+  sheets.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.lastX, dt = Math.max(e.timeStamp - drag.lastT, 1) / 1000;
+    if (!bandDragged && Math.abs(e.clientX - drag.startX) > TAP_SLOP_PX) {
+      bandDragged = true;
+      sheets.setPointerCapture(e.pointerId);
+      sheets.classList.add('dragging');
+    }
+    if (!bandDragged) return;
+    flowPos -= dx;
+    sheets.scrollLeft = flowPos;
+    drag = { ...drag, lastX: e.clientX, lastT: e.timeStamp, v: -dx / dt };
+  });
+  const endDrag = e => {
+    if (!drag) return;
+    const held = e.timeStamp - drag.lastT > FLING_HOLD_MS;
+    if (bandDragged && !held) fling = Math.max(-FLING_MAX_PX_PER_SEC, Math.min(FLING_MAX_PX_PER_SEC, drag.v));
+    drag = null;
+    sheets.classList.remove('dragging');
+  };
+  sheets.addEventListener('pointerup', endDrag);
+  sheets.addEventListener('pointercancel', endDrag);
+
   (function flow(t) {
     const dt = flowLast ? (t - flowLast) / 1000 : 0;
     flowLast = t;
-    if (flowOn && location.hash === '#result') {
-      if (Math.abs(sheets.scrollLeft - flowPos) > 2) flowPos = sheets.scrollLeft; // 손으로 넘긴 위치 따라감
-      if (!flowPaused && zoom.hidden) flowPos += FLOW_PX_PER_SEC * dt;
+    if (location.hash === '#result') {
+      if (Math.abs(sheets.scrollLeft - flowPos) > 2) flowPos = sheets.scrollLeft; // 휠·손가락으로 넘긴 위치 따라감
+      if (flowOn && !flowPaused && !drag && zoom.hidden) flowPos += FLOW_PX_PER_SEC * dt;
+      if (fling) {
+        flowPos += fling * dt;
+        fling *= Math.pow(FLING_DECAY_PER_SEC, dt);
+        if (Math.abs(fling) < 5) fling = 0;
+      }
       const loop = loopWidth();
       if (flowPos >= loop) flowPos -= loop;
       if (flowPos < 0) flowPos += loop;
