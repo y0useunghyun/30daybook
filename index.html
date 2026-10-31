@@ -13,9 +13,6 @@
     touch-action: none; cursor: grab;
   }
   .page.dragging { cursor: grabbing; }
-  .page { transition: opacity .4s ease; }
-  /* 결과물 띠가 열리면 뒤 배경을 살짝 죽임 */
-  body:has(#result:target) .page { opacity: .35; }
   .page > img { display: block; max-width: 92vw; max-height: 92vh; user-select: none; -webkit-user-drag: none; }
 
   /* 단어 링크: 로고처럼 마커로 그린 동그라미. 위치는 사진 기준 % */
@@ -47,7 +44,33 @@
   .sheets.dragging { cursor: grabbing; }
   .sheets .sheet { cursor: inherit; }
   .sheets img { user-select: none; -webkit-user-drag: none; }
-  .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */  .sheet {
+  .sheets:focus { outline: none; } /* #result 이동 때 생기는 포커스 테두리 */
+
+  /* 결과물·복잡이 열리면 아래에서 검은 막이 차오르며 배경을 죽임. 종이들은 그 위에 뜸 */
+  .dim {
+    position: fixed; inset: 0; z-index: 7; pointer-events: none;
+    background: rgba(0, 0, 0, .2);
+    transform: scaleY(0); transform-origin: bottom;
+    transition: transform .6s ease;
+  }
+  body:has(.sheets:target, .mess:target) .dim { transform: scaleY(1); }
+  @media (prefers-reduced-motion: reduce) { .dim { transition: none; } }
+
+  /* 복잡: 앞뒤 60장이 화면에 우수수. 빈 곳은 클릭이 배경으로 통과(→ 닫힘) */
+  .mess {
+    --paper-w: clamp(120px, 12vw, 200px);
+    display: none; position: fixed; inset: 0; z-index: 8; overflow: hidden; pointer-events: none;
+  }
+  .mess:target { display: block; }
+  .mess:focus { outline: none; }
+  .paper {
+    position: absolute; left: 0; top: 0; width: calc(var(--w) * var(--paper-w)); height: auto;
+    pointer-events: auto; cursor: grab; touch-action: none;
+    user-select: none; -webkit-user-drag: none;
+  }
+  .paper.dragging { cursor: grabbing; }
+
+  .sheet {
     position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer;
     transform-style: preserve-3d; transition: transform .6s ease;
   }
@@ -67,6 +90,8 @@
   .zoom .sheet img { width: auto; max-width: 90vw; max-height: 90vh; }
   .zoom .sheet .back { width: 100%; height: 100%; max-width: none; max-height: none; }
   .zoom .sheet:focus { outline: none; } /* 열 때 지면에 주는 포커스 테두리 숨김 (화면에 지면 하나뿐) */
+  /* 복잡에서 연 크게 보기: 누른 면 한 장만, 다시 누르면 닫힘 */
+  .zoom[data-mode="single"] .back { display: none; }
 
   /* logo.png는 842×596 캔버스 가운데에 그림이 있어서, 그림 부분만 잘라 보여줌 */
   .logo {
@@ -98,9 +123,12 @@
 <body>
   <main class="page">
     <img src="main/main_02.png" alt="클립으로 묶은 원문 지면과 사견 묶음">
-    <!-- ponytail: 링크 대상 미정이라 #앵커 -->
     <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
+    <a class="mark" href="#mess" aria-label="복잡 — 모든 종이 쏟기" style="left:67.8%; top:32.3%; width:4.6%; height:3.4%"></a>
   </main>
+  <div class="dim"></div>
+  <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
+  <section id="mess" class="mess" aria-label="모든 종이"></section>
   <!-- 결과물: 30일치 앞면. 누르면 뒷면. 뒤로가기·Esc·로고로 닫힘 -->
   <section id="result" class="sheets" aria-label="30일치 지면"></section>
   <div class="zoom" hidden role="dialog" aria-label="지면 크게 보기">
@@ -143,32 +171,112 @@
     const s = e.target.closest('.sheet');
     if (!s) return;
     const [front, back] = s.querySelectorAll('img');
-    zoom.querySelector('.front').src = front.src;
-    zoom.querySelector('.back').src = back.src;
+    openZoom('flip', front.src, back.src, `${s.getAttribute('aria-label').split(' ')[0]} 지면, 누르면 뒷면`);
+  });
+  // mode 'flip': 누르면 뒷면 (결과물) / 'single': 누르면 닫힘 (복잡)
+  function openZoom(mode, frontSrc, backSrc, label) {
+    zoom.dataset.mode = mode;
+    zoom.querySelector('.front').src = frontSrc;
+    zoom.querySelector('.back').src = backSrc || '';
     zoomSheet.classList.remove('flipped');
-    zoomSheet.setAttribute('aria-label', `${s.getAttribute('aria-label').split(' ')[0]} 지면, 누르면 뒷면`);
+    zoomSheet.setAttribute('aria-label', label);
     zoom.hidden = false;
     zoomSheet.focus();
-  });
+  }
   zoom.addEventListener('click', e => {
-    if (e.target.closest('.sheet')) zoomSheet.classList.toggle('flipped');
+    if (e.target.closest('.sheet') && zoom.dataset.mode === 'flip') zoomSheet.classList.toggle('flipped');
     else zoom.hidden = true;
   });
-  // 띠 바깥(배경)을 누르면 띠 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
+  // 결과물·복잡이 열린 상태에서 바깥(배경)을 누르면 닫힘. 배경을 끌어 옮긴 건 누름으로 안 침
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
+  const isOpen = () => location.hash === '#result' || location.hash === '#mess';
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY });
   addEventListener('click', e => {
     const moved = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > TAP_SLOP_PX;
-    if (moved || location.hash !== '#result' || !zoom.hidden) return;
-    if (e.target.closest('.sheets, .zoom, .mark, .logo')) return;
+    if (moved || !isOpen() || !zoom.hidden) return;
+    if (e.target.closest('.sheets, .paper, .zoom, .mark, .logo')) return;
     location.hash = '';
   });
   addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (!zoom.hidden) zoom.hidden = true;
-    else if (location.hash === '#result') location.hash = '';
+    else if (isOpen()) location.hash = '';
   });
+
+  // 복잡: 앞뒤 60장을 위에서 우수수 떨굼. 열 때마다 새로 흩어짐
+  const mess = document.getElementById('mess');
+  const DROP_STAGGER_MS = 20;
+  const DROP_MS = 700;
+  const MAX_TILT_DEG = 25;
+  const papers = SCAN.flatMap(([w, h], i) => ['front', 'back'].map(side => {
+    const img = new Image();
+    img.className = 'paper';
+    img.alt = '';
+    img.draggable = false;
+    img.width = w; img.height = h;
+    img.style.setProperty('--w', w / SCAN_MAX_W);
+    img.dataset.full = `pages/${side}/day${pad(i + 1)}.jpg`;
+    img.dataset.small = `pages/small/${side}${pad(i + 1)}.jpg`;
+    img.setAttribute('aria-label', `${i + 1}일차 ${side === 'front' ? '앞면' : '뒷면'}`);
+    return img;
+  }));
+  const paperPos = new Map(); // img → { x, y, r }
+  let paperTop = 0;
+  const place = (img, p) => {
+    paperPos.set(img, p);
+    img.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${p.r}deg)`;
+  };
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function dropPapers() {
+    const shuffled = [...papers].sort(() => Math.random() - .5);
+    const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    shuffled.forEach((img, k) => {
+      if (!img.src) img.src = img.dataset.small;
+      mess.append(img); // 순서대로 쌓임 (나중 것이 위)
+      img.style.zIndex = paperTop = k;
+      const pw = img.offsetWidth || 160; // 회전 영향 없는 너비
+      const ph = pw * img.height / img.width;
+      const end = { x: rand(-pw * .2, innerWidth - pw * .8), y: rand(-ph * .1, innerHeight - ph * .8), r: rand(-MAX_TILT_DEG, MAX_TILT_DEG) };
+      place(img, end);
+      if (animate) img.animate(
+        [{ transform: `translate(${end.x}px, ${-ph - rand(0, 300)}px) rotate(${end.r + rand(-120, 120)}deg)` }, { transform: img.style.transform }],
+        { duration: DROP_MS + rand(0, 300), delay: k * DROP_STAGGER_MS, easing: 'cubic-bezier(.25,.8,.35,1)', fill: 'backwards' }
+      );
+    });
+  }
+  const onHash = () => { if (location.hash === '#mess') dropPapers(); };
+  addEventListener('hashchange', onHash);
+  onHash();
+
+  // 종이 집어서 옮기기. 안 움직이고 놓으면 크게 보기
+  let held = null;
+  mess.addEventListener('pointerdown', e => {
+    const img = e.target.closest('.paper');
+    if (!img) return;
+    img.getAnimations().forEach(a => a.finish());
+    img.setPointerCapture(e.pointerId);
+    img.style.zIndex = ++paperTop;
+    held = { img, startX: e.clientX, startY: e.clientY, from: paperPos.get(img), moved: false };
+  });
+  mess.addEventListener('pointermove', e => {
+    if (!held) return;
+    const dx = e.clientX - held.startX, dy = e.clientY - held.startY;
+    if (!held.moved && Math.hypot(dx, dy) <= TAP_SLOP_PX) return;
+    held.moved = true;
+    held.img.classList.add('dragging');
+    place(held.img, { ...held.from, x: held.from.x + dx, y: held.from.y + dy });
+  });
+  const dropHeld = e => {
+    if (!held) return;
+    const { img, moved } = held;
+    held = null;
+    img.classList.remove('dragging');
+    if (!moved && e.type === 'pointerup') openZoom('single', img.dataset.full, null, `${img.getAttribute('aria-label')}, 누르면 작아짐`);
+  };
+  mess.addEventListener('pointerup', dropHeld);
+  mess.addEventListener('pointercancel', dropHeld);
 
   // 띠 자동 흐름: 천천히 왼쪽으로. 마우스 올리면/만지면 멈춤. 30장 끝나면 복제본 덕에 1일차로 이어짐
   const FLOW_PX_PER_SEC = 30;
@@ -258,7 +366,8 @@
   }
 
   addEventListener('wheel', e => {
-    if (!zoom.hidden) { e.preventDefault(); return; } // 크게 보기 중엔 뒤 배경 안 움직임
+    // 크게 보기·복잡 중엔 뒤 배경 안 움직임
+    if (!zoom.hidden || location.hash === '#mess') { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
