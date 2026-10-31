@@ -67,13 +67,19 @@
   }
   .paper.dragging { cursor: grabbing; }
 
-  /* BOOK: 읽은 책 표지 5개를 배경 위 가운데에 한 줄로 (복잡 종이 크기) */
-  .books {
-    display: none; position: fixed; inset: 0; z-index: 8;
-    align-items: center; justify-content: center; flex-wrap: wrap; gap: 24px; padding: 24px;
+  /* INFO·BOOK: 로고 메뉴의 그 줄(INFO/BOOK 글자) 높이에 윗선 맞춰 메뉴 오른쪽으로. top은 JS가 --row-top */
+  .books, .info {
+    display: none; position: fixed; z-index: 8; left: 168px; top: var(--row-top, 200px);
   }
-  .books:target { display: flex; }
-  .books:focus { outline: none; }
+  .books:target, .info:target { display: flex; }
+  .books:focus, .info:focus { outline: none; }
+  .books { right: 24px; align-items: flex-start; flex-wrap: wrap; gap: 24px; }
+  .info p {
+    margin: -10px 0 0; max-width: 30em; padding: 10px 14px; background: #fff; /* 배경 사진 글자와 안 겹치게. 위 여백만큼 올려 첫 줄을 INFO와 같은 높이로 */
+    font-size: 16px; line-height: 1.75; word-break: keep-all;
+  }
+  /* 메뉴 화면이 열려 있는 동안엔 로고 메뉴도 계속 보임 */
+  body:has(.books:target, .info:target) .side { display: block; }
   .books img { display: block; width: var(--paper-w); height: auto; box-shadow: var(--paper-shadow); }
 
   /* 계산: 종이 한 장 + 아래 입력줄. 꾸밈 최소, 검은 글씨·밑줄 */
@@ -176,6 +182,11 @@
   </section>
   <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
   <section id="mess" class="mess" aria-label="모든 종이"></section>
+  <!-- INFO: 소개 글 -->
+  <section id="info" class="info" aria-label="소개">
+    <p>30일 동안 매일 책을 읽고, 좋았던 구절을 옮겨 적은 뒤 그 아래에 읽고 든 생각을 적었습니다.<br>
+    생각을 그대로 보여 드리기는 부끄러워 스프레이로 덮고, 종이 뒷면에 찍어 냈습니다. 그 종이들을 웹으로 옮겼습니다.</p>
+  </section>
   <!-- BOOK: 읽은 책 표지 (알라딘 표지 이미지) -->
   <section id="book" class="books" aria-label="읽은 책">
     <img src="covers/tactical.jpg" alt="전술적 출판 — 알레산드로 루도비코">
@@ -193,7 +204,6 @@
   </div>
   <a class="logo" href="./"><img src="logo.png" alt="30 DAYS"></a>
   <nav class="side" aria-label="메뉴">
-    <!-- ponytail: INFO 화면은 아직 없음 -->
     <a href="#info">INFO</a>
     <a href="#book">BOOK</a>
   </nav>
@@ -251,7 +261,7 @@
   // click 대신 pointerup: 아이폰 사파리는 빈 영역 탭에 click을 안 보내서 모바일에서 안 닫혔음
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
   const SWALLOW_CLICK_MS = 400;
-  const isOpen = () => ['#result', '#mess', '#count', '#book'].includes(location.hash);
+  const isOpen = () => ['#result', '#mess', '#count', '#book', '#info'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
   addEventListener('pointerup', e => {
@@ -259,7 +269,7 @@
     const target = downAt?.target; // 캡처 중이면 e.target이 바뀌어서 누른 곳 기준
     downAt = null;
     if (!tap || !isOpen() || !zoom.hidden) return;
-    if (target?.closest('.sheets, .paper, .game-card, .books img, .zoom, .mark, .logo, .side')) return;
+    if (target?.closest('.sheets, .paper, .game-card, .books img, .info p, .zoom, .mark, .logo, .side')) return;
     // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게 한 번 삼킴
     const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
     addEventListener('click', swallow, { capture: true, once: true });
@@ -412,7 +422,17 @@
     }, HINT_MS);
   });
 
+  // INFO·BOOK 화면을 메뉴의 해당 글자 줄 높이에 맞춤
+  function alignToMenuRow() {
+    const link = document.querySelector(`.side a[href="${location.hash}"]`);
+    const view = document.querySelector(location.hash);
+    if (!link || !view) return;
+    view.style.setProperty('--row-top', `${link.getBoundingClientRect().top}px`);
+  }
+  addEventListener('resize', alignToMenuRow);
+
   const onHash = () => {
+    if (location.hash === '#info' || location.hash === '#book') alignToMenuRow();
     if (location.hash === '#mess') dropPapers();
     if (location.hash === '#count') newRound();
   };
@@ -536,7 +556,7 @@
 
   addEventListener('wheel', e => {
     // 크게 보기·복잡·글자수 게임 중엔 뒤 배경 안 움직임
-    if (!zoom.hidden || ['#mess', '#count', '#book'].includes(location.hash)) { e.preventDefault(); return; }
+    if (!zoom.hidden || ['#mess', '#count', '#book', '#info'].includes(location.hash)) { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
