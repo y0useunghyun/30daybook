@@ -149,7 +149,7 @@
     <div class="game-card">
       <img alt="">
       <form>
-        <input type="number" inputmode="numeric" min="1" max="9999" placeholder="본문은 몇 글자일까요?" aria-label="본문은 몇 글자일까요 (띄어쓰기 빼고)" autocomplete="off">
+        <input type="number" inputmode="numeric" min="1" max="9999" placeholder="총 몇 자일까요?" aria-label="이 종이는 총 몇 자일까요 (띄어쓰기 빼고)" autocomplete="off">
         <p class="game-hint sr-only" aria-live="polite"></p>
       </form>
     </div>
@@ -301,8 +301,8 @@
 
 
   // 계산 가능: 아무 앞면 한 장 → 글자수 맞히기 (기회 3번, 업/다운)
-  // 글자수 = macOS Vision OCR로 센 본문 글자 (공백 제외, 맨 위 책 제목·쪽수 줄 제외)
-  const CHAR_COUNTS = [499,634,695,519,383,366,579,583,511,336,346,564,470,416,310,433,394,451,491,430,369,564,503,264,326,464,572,589,189,316];
+  // 글자수 = macOS Vision OCR로 센 종이 전체 글자 (공백 제외, 맨 위 책 제목·쪽수 줄 포함)
+  const CHAR_COUNTS = [508,643,704,528,392,378,591,596,524,349,359,577,483,426,320,444,405,462,503,442,381,576,515,277,339,473,581,598,199,326];
   const GUESS_TRIES = 3;
   const GUESS_TOLERANCE = 5; // ponytail: OCR이 몇 자 틀릴 수 있어 ±5는 정답 처리. 직접 센 값 생기면 0으로
   const game = document.getElementById('count');
@@ -310,7 +310,7 @@
   const gameForm = game.querySelector('form');
   const guessInput = game.querySelector('input');
   const gameHint = game.querySelector('.game-hint');
-  const GAME_ASK = '본문은 몇 글자일까요?';
+  const GAME_ASK = '총 몇 자일까요?';
   let round = null; // { day, answer, left, over }
   // 입력칸을 비우고 그 자리에 안내를 띄움 (화면엔 placeholder, 스크린리더엔 숨은 문단)
   const say = (msg, strong = true) => {
