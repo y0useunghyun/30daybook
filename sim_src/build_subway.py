@@ -32,8 +32,9 @@ M = {
  'seatp':   dict(color='#efbfcd', rough=.32, gain=.62),
  'strap':   dict(color='#8b8e90', rough=.45),
  'ledc':    dict(color='#ffffff', rough=1, emit=7.0),
- 'tunnel':  dict(map='tunnel', rough=.05, unlit=True),
+ 'tunnel':  dict(color='#6f7276', rough=.05, unlit=True),   # 창밖: 움직이지 않는 회색 통로
  'gang':    dict(map='gang', rough=.1, unlit=True),
+ 'gangW':   dict(map='gang', rough=.1, unlit=True),
  'lcd':     dict(color='#101012', rough=.2, unlit=True),
  'extred':  dict(color='#b3201f', rough=.3),
  'route':   dict(map='route', rough=.5, gain=.75),
@@ -43,7 +44,7 @@ M = {
  'sill':    dict(color='#cfd1d2', rough=.5),
  'alu':     dict(color='#a7aaad', rough=.35, metal=.9),
  **{f'leaf{k}': dict(color='#c6c8c9', rough=.36, metal=.25, gain=.85) for k in ('AL', 'AR', 'BL', 'BR')},
- **{f'glass{k}': dict(color='#4f8e85', rough=.1, unlit=True) for k in ('AL', 'AR', 'BL', 'BR')},
+ **{f'glass{k}': dict(color='#6f7276', rough=.1, unlit=True) for k in ('AL', 'AR', 'BL', 'BR')},
 }
 exec(open(os.path.join(os.path.dirname(TEX), 'kit.py')).read())
 colliders = []
@@ -144,10 +145,10 @@ for x, s in ((X0, 1), (X1, -1)):
     for a, b in ((YS, wide[0]), (wide[1], YN)):
         p = pts(a, b, 0, ZC + .01); face(p if s > 0 else p[::-1], 'fw')
     p = pts(*wide, 1.9, ZC + .01); face(p if s > 0 else p[::-1], 'fw')
-    if s > 0:  # 서쪽 끝은 다음 칸 그림, 동쪽 끝은 진짜 통로(아래)
+    if s > 0:  # 맨 뒤 칸에서만 보일 막음 그림(웹에서 칸별로 켜고 끔). 그 외엔 앞 칸으로 뚫림
         gx = x + s * .002
         gp = [(gx, wide[0], 0), (gx, wide[1], 0), (gx, wide[1], 1.9), (gx, wide[0], 1.9)]
-        face(gp, 'gang', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
+        face(gp, 'gangW', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
     for yy in wide:
         box(*sorted((x, x + s * .05)), yy - .03, yy + .03, 0, 1.93, 'steel')
     box(*sorted((x, x + s * .05)), wide[0] - .03, wide[1] + .03, 1.9, 1.96, 'steel')
@@ -156,7 +157,7 @@ for x, s in ((X0, 1), (X1, -1)):
     box(*sorted((x, x + s * .05)), YC - .3, YC + .3, 1.96, 2.08, 'rubber')
     face(pp if s > 0 else pp[::-1], 'lcd', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)] if s > 0 else [(1, 1), (0, 1), (0, 0), (1, 0)])
     sweep([(x + s * .09, wide[0] - .22, 0), (x + s * .09, wide[0] - .22, .52)], .07, 'extred', 14)
-    if s > 0: colliders.append([x - 1, YS - 1, x, YN + 1])
+    if s > 0: colliders += [[x - .02, YS - 1, x, wide[0]], [x - .02, wide[1], x, YN + 1]]
 # 연결 통로: 주름 벽 + 철판 바닥. 눈높이에 종이를 붙임(웹). 끝은 다음 칸
 VL, VW = 1.05, .5                                # 길이, 반폭
 VX1 = X1 + VL
@@ -171,7 +172,7 @@ face([(VX1, YC - VW, 1.96), (X1, YC - VW, 1.96), (X1, YC + VW, 1.96), (VX1, YC +
 face([(X1 + .8, YC - .08, 1.955), (X1 + .25, YC - .08, 1.955), (X1 + .25, YC + .08, 1.955), (X1 + .8, YC + .08, 1.955)], 'ledc')
 gp = [(VX1, YC + VW, 0), (VX1, YC - VW, 0), (VX1, YC - VW, 1.96), (VX1, YC + VW, 1.96)]
 face(gp, 'gang', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
-colliders += [[X1, YS - 1, VX1 + 1, YC - VW], [X1, YC + VW, VX1 + 1, YN + 1], [VX1, YC - VW, VX1 + 1, YC + VW]]
+colliders += [[X1, YS - 1, VX1, YC - VW], [X1, YC + VW, VX1, YN + 1]]
 # 좌석
 SEAT_Z, DEPTH = .43, .47
 # 등받이~앉는 면을 한 판으로 (벽에서 나온 거리, 앉는 면 기준 높이)
@@ -246,5 +247,5 @@ for k in range(9):
     box(x - .2, x + .2, YC - .17, YC + .17, ZC - .012, ZC - .002, 'fw')
     for j in range(-5, 6): box(x - .18, x + .18, YC + j * .027 - .009, YC + j * .027 + .009, ZC - .016, ZC - .012, 'rubber')
     if k % 3 == 1: sweep([(x + .9, YC, ZC - .002), (x + .9, YC, ZC - .05)], lambda i: .05, 'fw', 14)
-colliders += [[X0 - 1, YS - 1, X1, YS], [X0 - 1, YN, 3.8, YN + .05], [4.75, YN, 8.2, YN + .05], [9.15, YN, X1, YN + .05]]
-finish((6.5, YC, 1.3), 0.0, {'colliders': [[round(v, 3) for v in c] for c in colliders], 'tunnelTile': TUNNEL_TILE, 'gangway': {'x0': X1, 'x1': VX1, 'yc': YC, 'halfW': VW}})
+colliders += [[X0, YS - 1, X1, YS], [X0, YN, 3.8, YN + .05], [4.75, YN, 8.2, YN + .05], [9.15, YN, X1, YN + .05]]
+finish((6.5, YC, 1.3), 0.0, {'colliders': [[round(v, 3) for v in c] for c in colliders], 'tunnelTile': TUNNEL_TILE, 'gangway': {'x0': X1, 'x1': VX1, 'yc': YC, 'halfW': VW}, 'carPitch': round(VX1 - X0, 3), 'carX0': X0, 'carYN': YN, 'carYS': YS})

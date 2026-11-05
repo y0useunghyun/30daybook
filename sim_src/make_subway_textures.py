@@ -13,14 +13,6 @@ noise = lambda sz, sig: (lambda n: n / n.std())(cv2.GaussianBlur(rng.normal(0, 1
 # 바닥: 무광 회색 시트 (BGR). 가운데 파란 띠는 지오메트리
 f = np.array([138., 136., 134.], np.float32)[None, None] * (1 + .012 * noise((1024, 1024), 40)[..., None]) + (noise((1024, 1024), .9) * 2.5)[..., None]
 save('sfloor', f, 84)
-# 터널: 어두운 벽 + 케이블 + 조명 하나. 달리는 속도로 번짐. 8m 타일
-T = np.full((256, 1536, 3), (128., 118., 66.), np.float32)
-T += (cv2.GaussianBlur(rng.normal(0, 1, (256, 1536)).astype(np.float32), (121, 3), 0) * 20)[..., None]
-for y, c in ((70, 8), (84, 10), (96, 6), (178, 12)): T[y:y + 3] *= .72; T[y + 3:y + 4] += c
-g = np.zeros((256, 1536), np.float32); cv2.ellipse(g, (768, 52), (150, 10), 0, 0, 360, 1, -1, cv2.LINE_AA)
-g = cv2.GaussianBlur(g, (0, 0), 14)
-T += g[..., None] * np.array([170., 205., 225.], np.float32) * 1.3
-save('tunnel', T, 82)
 # 연결 통로 너머 다음 칸: 흰 벽 + 파란 띠가 멀어지는 그림
 GW, GH = 512, 880; gang = np.full((GH, GW, 3), (232, 234, 234), np.uint8)
 vx, vy = GW // 2, int(GH * .44)

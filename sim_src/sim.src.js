@@ -7,7 +7,7 @@ const BASE = new URL('.', import.meta.url).href;
 const EYE = 1.5, RADIUS = .2, WALK_SPEED = 1.5, TURN_PER_PX = .0032, WHEEL_STEP = .0025, TAP_SLOP_PX = 6;
 const PITCH_MAX = 1.35;
 const SPAWN = { x: 2.15, y: .95, yaw: 62 * Math.PI / 180, pitch: -.1 }; // 8번 사진 자리
-const BOUNDS = { x0: -2.1, x1: 16.15, y0: -2.85 };                      // 객차까지 포함한 걸을 수 있는 범위
+const BOUNDS_Y0 = -2.85; // 객차 남쪽 끝
 const SOUTH_AISLE_Y = .95, EAST_AISLE_X = 6.6;                          // 책상 줄을 건널 수 있는 통로
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -15,7 +15,8 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PILE = { x: 7.75, y: 6.1, z: .792, spread: .3, gap: .0014, sheetW: .2, reach: 2.4 };
 const DOOR_OPEN_RAD = -95 * Math.PI / 180, DOOR_MS = 900, LEAF_SLIDE = .66, DOOR_REACH = 1.7, DOOR_STAND = .72;
 const GANGWAY = { cols: 5, rowZ: [1.68, 1.36, 1.04], sheetW: .178, off: .03, reach: 1.5, color: 0xdedcd4 };
-const TUNNEL_PER_SEC = .32, LCD_MS = 6000;
+const SWITCH = { reach: 1.7, tilt: .32, stand: .85, dimUnlit: .4, dimLed: 0x77797a, dimEnv: .25 };
+const LCD_MS = 6000, SETTLE_MS = 1500;
 const STATIONS = '진접 오남 별내별가람 당고개 상계 노원 창동 쌍문 수유 미아 미아사거리 길음 성신여대입구 한성대입구 혜화 동대문 동대문역사문화공원 충무로 명동 회현 서울역 숙대입구 삼각지 신용산 이촌 동작 총신대입구 사당 남태령 선바위 경마공원 대공원 과천 정부과천청사 인덕원 평촌 범계 금정 산본 수리산 대야미 반월 상록수 한대앞 중앙 고잔 초지 안산 신길온천 정왕 오이도'.split(' ');
 
 // Blender 좌표(x 동, y 북, z 위) → three (x, z, -y)
@@ -68,7 +69,10 @@ async function loadPart(dir, renderer, loader, extra = () => null) {
     const color = d.map ? (d.tint || 0xffffff) : (d.color || '#ffffff');
     const lit = meta.lightmapScale * (d.gain ?? 1);
     let m;
-    if (d.emit || d.unlit) m = new THREE.MeshBasicMaterial({ map, color }); // 빛 계산 안 함: 형광등·창·작은 종이
+    if (d.emit || d.unlit) { // 빛 계산 안 함: 형광등·블라인드·문짝·작은 종이
+      m = new THREE.MeshBasicMaterial({ map, color });
+      if (d.opacity) { m.transparent = true; m.opacity = d.opacity; m.depthWrite = false; m.side = THREE.DoubleSide; }
+    }
     else if ((d.rough ?? .6) >= .7 && !d.metal) m = new THREE.MeshBasicMaterial({ map, color, lightMap, lightMapIntensity: lit });
     else m = new THREE.MeshStandardMaterial({
       map, color, roughness: d.rough ?? .6, metalness: d.metal ?? 0,
@@ -82,7 +86,19 @@ async function loadPart(dir, renderer, loader, extra = () => null) {
     o.material = material(name); o.userData.mat = name;
     o.matrixAutoUpdate = false; o.frustumCulled = false;
   });
-  return { meta, root: gltf.scene };
+  // 불 켜기/끄기: 구운 빛 지도를 바꿔 끼움. 스스로 빛나는 것(블라인드·비상구)은 그대로
+  const lightMapOff = meta.lightmapOff ? await loader.loadAsync(`${url}lightmap_off.webp`) : null;
+  if (lightMapOff) { lightMapOff.colorSpace = THREE.SRGBColorSpace; lightMapOff.flipY = false; lightMapOff.channel = 1; lightMapOff.generateMipmaps = false; lightMapOff.minFilter = lightMapOff.magFilter = THREE.LinearFilter; }
+  const setLights = on => {
+    for (const [name, m] of Object.entries(cache)) {
+      const d = meta.materials[name] || {};
+      if (m.lightMap) m.lightMap = on ? lightMap : lightMapOff;
+      if (m.envMap) m.envMapIntensity = (d.metal ? 1 : .35) * (on ? 1 : SWITCH.dimEnv);
+      if (name === 'led') m.color.set(on ? 0xffffff : SWITCH.dimLed);
+      else if (d.unlit && !d.emit) m.color.set(d.color || 0xffffff).multiplyScalar(on ? 1 : SWITCH.dimUnlit);
+    }
+  };
+  return { meta, root: gltf.scene, setLights };
 }
 
 // 책상 위 30장. 누르면 위에서 한 장 집어 옆 더미로. 다 넘기면 방향만 바뀜
@@ -125,6 +141,7 @@ function makePile(scene, loader, sizes) {
   proxy.position.copy(toThree(PILE.x, PILE.y, PILE.z + .02)); proxy.visible = false; scene.add(proxy);
   return {
     proxy, maps,
+    setLights(on) { sheets.forEach(s => s.mesh.material.color.set(0xf2f0e8).multiplyScalar(on ? 1 : SWITCH.dimUnlit)); },
     take() {
       if (!stacks[source].length) source = 1 - source;
       const sheet = stacks[source].pop();
@@ -158,6 +175,31 @@ function makeGangwayPapers(scene, gw, maps, sizes) {
     return mesh;
   });
   return { group, papers };
+}
+
+// 똑딱이 스위치: 판은 굽힌 모델, 레버·글자는 여기서. x·z는 Blender 좌표, 남쪽 벽에 붙음
+function makeSwitches(scene, list) {
+  const label = text => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 40;
+    const g = c.getContext('2d'); g.fillStyle = '#e9e9e4'; g.fillRect(0, 0, 128, 40);
+    g.font = '500 26px SUIT, sans-serif'; g.fillStyle = '#222'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 64, 22);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshBasicMaterial({ map: t });
+  };
+  const leverMat = new THREE.MeshBasicMaterial({ color: 0xf4f4f0 });
+  const baseMat = new THREE.MeshBasicMaterial({ color: 0xb6b6b0 });
+  const labels = { light: label('전등'), ac: label('에어컨') };
+  return list.map(sw => {
+    const pos = toThree(sw.x, .012, sw.z);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(.034, .05, .004), baseMat); base.position.copy(pos); scene.add(base);
+    const pivot = new THREE.Group(); pivot.position.copy(pos); scene.add(pivot);
+    // 벽에서 방 쪽(three -z)으로 튀어나온 레버
+    const lever = new THREE.Mesh(new THREE.BoxGeometry(.016, .012, .032), leverMat); lever.position.z = -.016; pivot.add(lever);
+    const tag = new THREE.Mesh(new THREE.PlaneGeometry(.08, .025), labels[sw.kind]); tag.position.copy(toThree(sw.x, .0125, sw.z + .1)); tag.rotation.y = Math.PI; scene.add(tag);
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(.14, .22, .1)); proxy.position.copy(pos); proxy.visible = false; scene.add(proxy);
+    const set = up => { pivot.rotation.x = up ? -SWITCH.tilt : SWITCH.tilt; };
+    return { ...sw, proxy, set };
+  });
 }
 
 function makeLcd() {
@@ -208,23 +250,25 @@ async function build(root, opts) {
   scene.add(room.root);
   const [W, D] = room.meta.size;
 
-  // 창밖: 건물 밖 큰 판 (걸으면 시차). 사진 한 판 = 가로 OUT_UNIT m, 1번 창에 아파트, 좌우는 거울 반복
-  const outsideMap = loader.load(`${BASE}tex/outside.jpg`); outsideMap.colorSpace = THREE.SRGBColorSpace;
-  const OUT_DIST = 8, OUT_UNIT = 8.4, OUT_SPAN = 90, OUT_LEFT = W / 2 - OUT_SPAN / 2, OUT_ORIGIN = -.39, OUT_H = OUT_UNIT * 1220 / 2670;
-  outsideMap.wrapS = THREE.MirroredRepeatWrapping;
-  outsideMap.repeat.x = OUT_SPAN / OUT_UNIT; outsideMap.offset.x = (OUT_LEFT - OUT_ORIGIN) / OUT_UNIT;
-  const outside = new THREE.Mesh(new THREE.PlaneGeometry(OUT_SPAN, OUT_H), new THREE.MeshBasicMaterial({ map: outsideMap }));
-  outside.position.copy(toThree(W / 2, D + OUT_DIST, 1.45));
-  scene.add(outside);
-
   const pile = makePile(scene, loader, opts.sheets);
 
+  let refl = null;
   if (!touch) { // 바닥 반사 (폰은 생략)
-    const refl = new Reflector(new THREE.PlaneGeometry(W, D), { textureWidth: 1024, textureHeight: 1024, clipBias: .001, shader: REFLECT_SHADER, multisample: 0 });
+    refl = new Reflector(new THREE.PlaneGeometry(W, D), { textureWidth: 1024, textureHeight: 1024, clipBias: .001, shader: REFLECT_SHADER, multisample: 0 });
     refl.material.transparent = true; refl.material.depthWrite = false;
     refl.rotation.x = -Math.PI / 2; refl.position.copy(toThree(W / 2, D / 2, .002));
     scene.add(refl);
   }
+
+  const switches = makeSwitches(scene, room.meta.switches);
+  const sim = { lights: true, ac: true };
+  const syncSwitches = () => switches.forEach(sw => sw.set(sw.kind === 'ac' ? sim.ac : sim.lights));
+  syncSwitches();
+  const setLights = on => {
+    lastView = ''; sim.lights = on; room.setLights(on); pile.setLights(on); syncSwitches();
+    const b = root.querySelector('.sim-light'); if (b) b.textContent = on ? '강의실 불 끄기' : '강의실 불 켜기';
+  };
+  const flip = sw => { if (sw.kind === 'ac') { lastView = ''; sim.ac = !sim.ac; syncSwitches(); } else setLights(!sim.lights); };
 
   // ── 문: 교실 문짝(경첩으로 돎)과 객차 문짝(옆으로 밀림)을 한 쌍으로
   const doors = room.meta.doors.map(d => {
@@ -236,17 +280,24 @@ async function build(root, opts) {
     proxy.position.copy(toThree((d.x0 + d.x1) / 2, -.15, 1.12)); proxy.visible = false; scene.add(proxy);
     return { ...d, mid: (d.x0 + d.x1) / 2, pivot, proxy, leaves: [], open: false, t: 0 };
   });
-  let subway = null, tunnelMap = null, gangway = null;
+  let subway = null, train = null, trainColliders = [], gangway = null;
+  const bounds = { x0: .2, x1: W - .2 };
   const lcd = makeLcd();
-  const subwayReady = loadPart('subway/', renderer, loader, (name, tex, env) => {
+  const subwayReady = loadPart('subway/', renderer, loader, name => {
     if (name === 'lcd') return new THREE.MeshBasicMaterial({ map: lcd.map });
-    if (name === 'tunnel') {
-      tunnelMap = tex('tunnel');
-      return new THREE.MeshBasicMaterial({ map: tunnelMap, envMap: env, combine: THREE.AddOperation, reflectivity: .12 }); // 어두운 창에 객차 안이 비침
-    }
     return null;
   }).then(part => {
-    subway = part; part.root.visible = false; scene.add(part.root);
+    subway = part;
+    const P = part.meta.carPitch;
+    // 앞뒤 칸은 같은 칸을 복제 (구운 빛·파일 재사용). 끝 막음 그림은 맨 끝 칸에서만
+    const back = part.root.clone(true), front = part.root.clone(true);
+    back.position.x = -P; front.position.x = P;
+    const showEnds = (r, gang, gangW) => r.traverse(o => {
+      if (o.userData.mat === 'gang') o.visible = gang;
+      if (o.userData.mat === 'gangW') o.visible = gangW;
+    });
+    showEnds(part.root, false, false); showEnds(back, false, true); showEnds(front, true, false);
+    train = new THREE.Group(); train.visible = false; train.add(part.root, back, front); scene.add(train);
     part.root.traverse(o => {
       const m = o.userData.mat?.match(/^(?:leaf|glass)([AB])([LR])$/);
       if (!m) return;
@@ -254,6 +305,16 @@ async function build(root, opts) {
       doors.find(d => d.id === m[1]).leaves.push({ mesh: o, dir: m[2] === 'L' ? -1 : 1 });
     });
     gangway = { ...part.meta.gangway, ...makeGangwayPapers(scene, part.meta.gangway, pile.maps, opts.sheets) };
+    const shift = (c, dx) => [c[0] + dx, c[1], c[2] + dx, c[3]];
+    const { carX0, carYN: yn, carYS: ys } = part.meta;
+    const noHoles = dx => room.meta.doors.map(d => [d.x0 + dx, yn, d.x1 + dx, yn + .05]); // 앞뒤 칸 문은 안 열림
+    const walkLimit = { x0: carX0 - P + RADIUS, x1: part.meta.gangway.x1 + P - RADIUS };
+    trainColliders = [
+      ...part.meta.colliders,
+      ...[-P, P].flatMap(dx => [...part.meta.colliders.map(c => shift(c, dx)), ...noHoles(dx)]),
+      [carX0 - P - 1, ys - 1, carX0 - P, yn + 1], [part.meta.gangway.x1 + P, ys - 1, part.meta.gangway.x1 + P + 1, yn + 1],
+    ];
+    Object.assign(bounds, walkLimit);
     rebuildColliders();
     return part;
   });
@@ -263,7 +324,7 @@ async function build(root, opts) {
   let colliders = [];
   // 닫힌 문은 벽처럼 막음. 객차가 아직 안 왔으면 문은 안 열림
   function rebuildColliders() {
-    colliders = [...room.meta.colliders, ...(subway?.meta.colliders ?? []), ...doors.filter(d => !d.open).map(d => [d.x0, -.3, d.x1, 0])];
+    colliders = [...room.meta.colliders, ...trainColliders, ...doors.filter(d => !d.open).map(d => [d.x0, -.3, d.x1, 0])];
   }
   rebuildColliders();
   const applyDoor = d => {
@@ -274,19 +335,18 @@ async function build(root, opts) {
   const openDoor = async d => {
     if (d.open) return;
     await subwayReady;
-    subway.root.visible = true; gangway.group.visible = true;
+    train.visible = true; gangway.group.visible = true; lastView = ''; invalidate();
     d.open = true; rebuildColliders();
     if (reducedMotion) { d.t = 1; applyDoor(d); }
   };
 
-  const applyCamera = t => {
+  const applyCamera = () => {
     camera.position.copy(toThree(state.x, state.y, EYE));
     const c = Math.cos(state.pitch);
     camera.lookAt(camera.position.clone().add(toThree(Math.cos(state.yaw) * c, Math.sin(state.yaw) * c, Math.sin(state.pitch))));
-    // 객차 안에선 아주 살짝 흔들림
-    if (state.y < -.3 && !reducedMotion) camera.rotateZ(Math.sin(t / 900) * .0016 + Math.sin(t / 370) * .0007);
   };
   const resize = () => {
+    lastView = '';
     const w = root.clientWidth || innerWidth, h = root.clientHeight || innerHeight;
     camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false);
   };
@@ -313,6 +373,7 @@ async function build(root, opts) {
     const dx = PILE.x - state.x, dy = PILE.y - state.y;
     state.yaw = Math.atan2(dy, dx); state.pitch = Math.atan2(PILE.z - EYE, Math.hypot(dx, dy));
     interacted();
+    lastView = '';
     opts.openSheet(pile.take());
   };
   const reachPile = () => {
@@ -331,6 +392,12 @@ async function build(root, opts) {
     const toCar = door ? [{ x: door.mid, y: DOOR_STAND }, { x: door.mid, y: -DOOR_STAND }] : [];
     walkRoute([...toCar, { x: gangway.x0 - .4, y: gangway.yc }, { x: (gangway.x0 + gangway.x1) / 2, y: gangway.yc }], open);
   };
+  const reachSwitch = sw => {
+    interacted();
+    if (Math.hypot(sw.x - state.x, -state.y) <= SWITCH.reach) return flip(sw);
+    if (inCar()) return; // 객차 안에선 교실 스위치에 안 감
+    walkRoute([{ x: state.x, y: SOUTH_AISLE_Y }, { x: sw.x, y: SWITCH.stand }], () => flip(sw));
+  };
   const reachDoor = d => {
     interacted();
     const fromCar = inCar();
@@ -340,6 +407,7 @@ async function build(root, opts) {
     walkRoute([{ x: state.x, y: SOUTH_AISLE_Y }, { x: d.mid, y: DOOR_STAND }], () => openDoor(d));
   };
   root.querySelector('.sim-take')?.addEventListener('click', pickSheet);
+  root.querySelector('.sim-light')?.addEventListener('click', () => setLights(!sim.lights));
   root.querySelector('.sim-door')?.addEventListener('click', () => {
     const d = doors.find(v => !v.open) ?? doors[0];
     state.x = d.mid; state.y = .72; state.yaw = -Math.PI / 2; state.pitch = 0;
@@ -356,11 +424,13 @@ async function build(root, opts) {
   const targetUnderRay = () => {
     const closed = doors.filter(d => !d.open);
     const papers = gangway?.group.visible ? gangway.papers : [];
-    const hits = ray.intersectObjects([pile.proxy, ...closed.map(d => d.proxy), ...papers], false);
+    const hits = ray.intersectObjects([pile.proxy, ...closed.map(d => d.proxy), ...papers, ...switches.map(v => v.proxy)], false);
     if (!hits.length) return null;
     const o = hits[0].object;
     if (o === pile.proxy) return { pile: true };
     if (o.userData.day !== undefined) return { paper: o };
+    const sw = switches.find(v => v.proxy === o);
+    if (sw) return { sw };
     return { door: closed.find(d => d.proxy === o) };
   };
   el.addEventListener('pointerdown', e => {
@@ -386,9 +456,10 @@ async function build(root, opts) {
     const target = targetUnderRay();
     if (target?.pile) return reachPile();
     if (target?.door) return reachDoor(target.door);
+    if (target?.sw) return reachSwitch(target.sw);
     if (target?.paper) { const p = target.paper.position; return readPaper(target.paper.userData.day, p.x, -p.z); }
     if (ray.ray.intersectPlane(floorPlane, hit)) {
-      state.goal = { x: Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, hit.x)), y: Math.max(BOUNDS.y0, Math.min(D - .2, -hit.z)), stuck: 0 };
+      state.goal = { x: Math.max(bounds.x0, Math.min(bounds.x1, hit.x)), y: Math.max(BOUNDS_Y0, Math.min(D - .2, -hit.z)), stuck: 0 };
       interacted();
     }
   };
@@ -408,6 +479,9 @@ async function build(root, opts) {
   addEventListener('keyup', e => state.keys.delete(e.code));
   addEventListener('blur', () => state.keys.clear());
 
+  let lastView = '', redrawUntil = 0;
+  const invalidate = () => { redrawUntil = performance.now() + SETTLE_MS; };
+  THREE.DefaultLoadingManager.onProgress = invalidate; // 질감이 늦게 도착하면 다시 그림
   const has = (...k) => k.some(v => state.keys.has(v));
   const arrive = () => { const then = state.goal.then; state.goal = null; then?.(); };
   function step(t) {
@@ -433,16 +507,21 @@ async function build(root, opts) {
       }
     }
     doors.forEach(d => { if (d.open && d.t < 1) { d.t = Math.min(1, d.t + dt * 1000 / DOOR_MS); applyDoor(d); } });
-    if (tunnelMap && subway?.root.visible && !reducedMotion) tunnelMap.offset.x = (tunnelMap.offset.x + TUNNEL_PER_SEC * dt) % 1;
-    if (t - state.lcdAt > LCD_MS) { state.lcdAt = t; lcd.next(); }
-    applyCamera(t);
-    renderer.render(scene, camera);
+    if (t - state.lcdAt > LCD_MS) { state.lcdAt = t; lcd.next(); if (train?.visible) invalidate(); }
+    // 움직임이 없으면 다시 그리지 않음 (렉·배터리)
+    const view = `${state.x},${state.y},${state.yaw},${state.pitch},${camera.fov}`;
+    if (view !== lastView || doors.some(d => d.open && d.t < 1) || t < redrawUntil) {
+      lastView = view;
+      if (refl) refl.visible = state.y > -.3; // 객차 안에선 교실 바닥 반사 끔
+      applyCamera();
+      renderer.render(scene, camera);
+    }
     requestAnimationFrame(step);
   }
   return {
-    start() { if (state.running) return; state.running = true; state.last = performance.now(); resize(); requestAnimationFrame(step); },
+    start() { if (state.running) return; state.running = true; state.last = performance.now(); resize(); invalidate(); requestAnimationFrame(step); },
     stop() { state.running = false; state.keys.clear(); state.goal = null; },
-    state, camera, doors, openDoor, subwayReady,
+    state, camera, doors, openDoor, subwayReady, sim,
   };
 }
 
@@ -460,5 +539,5 @@ export const pose = (x, y, yawDeg, pitchDeg = 0, fov) => {
   if (fov) { ui.camera.fov = fov; ui.camera.updateProjectionMatrix(); }
   return true;
 };
-export const where = () => ui && { x: ui.state.x, y: ui.state.y, doors: ui.doors.map(d => [d.id, d.open]), yaw: ui.state.yaw, pitch: ui.state.pitch };
+export const where = () => ui && { x: ui.state.x, y: ui.state.y, doors: ui.doors.map(d => [d.id, d.open]), lights: ui.sim.lights, ac: ui.sim.ac, yaw: ui.state.yaw, pitch: ui.state.pitch };
 export const openAllDoors = async () => { await ui.subwayReady; await Promise.all(ui.doors.map(ui.openDoor)); };

@@ -68,7 +68,7 @@ def srgb(h):
     v = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
     return [(c / 12.92 if c < .04045 else ((c + .055) / 1.055) ** 2.4) for c in v] + [1]
 
-def finish(env_loc, sky, extra):
+def finish(env_loc, sky, extra, off=()):
     """메시 완성 → lightmap UV → Cycles 굽기 → env 360° → glb + scene.json"""
     me = bpy.data.meshes.new('room'); bm.normal_update(); bm.to_mesh(me); bm.free()
     obj = bpy.data.objects.new('room', me); bpy.context.collection.objects.link(obj)
@@ -119,6 +119,13 @@ def finish(env_loc, sky, extra):
     px = np.array(lm.pixels[:], dtype=np.float32).reshape(LM_PX, LM_PX, 4)[::-1, :, :3]
     np.save(f'{OUT}/lightmap.npy', px)
     print('bake done', px.mean(), px.max(), flush=True)
+    if off:  # 전등을 끈 상태 한 번 더
+        for n in off: bpy.data.materials[n].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 0
+        bpy.ops.object.bake(type='DIFFUSE', uv_layer='lm', margin=6, use_clear=True)
+        dark = np.array(lm.pixels[:], dtype=np.float32).reshape(LM_PX, LM_PX, 4)[::-1, :, :3]
+        np.save(f'{OUT}/lightmap_off.npy', dark)
+        print('off bake done', dark.mean(), dark.max(), flush=True)
+        for n in off: bpy.data.materials[n].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = M[n]['emit']
     cam = bpy.data.cameras.new('env'); cam.type = 'PANO'
     cam.panorama_type = 'EQUIRECTANGULAR'
     co = bpy.data.objects.new('env', cam); bpy.context.collection.objects.link(co)
@@ -132,6 +139,6 @@ def finish(env_loc, sky, extra):
     bpy.data.objects.remove(co)
     bpy.ops.export_scene.gltf(filepath=f'{OUT}/room.glb', export_format='GLB', use_selection=False, export_image_format='NONE',
         export_materials='EXPORT', export_texcoords=True, export_normals=True, export_apply=False, export_cameras=False, export_lights=False, export_yup=True)
-    json.dump({**extra, 'materials': {n: {k: v for k, v in M[n].items() if k in ('color', 'map', 'rough', 'metal', 'emit', 'gain', 'tint', 'unlit')} for n in names}},
+    json.dump({**extra, 'materials': {n: {k: v for k, v in M[n].items() if k in ('color', 'map', 'rough', 'metal', 'emit', 'gain', 'tint', 'unlit', 'opacity')} for n in names}},
               open(f'{OUT}/scene.json', 'w'), ensure_ascii=False)
     print('all done', flush=True)

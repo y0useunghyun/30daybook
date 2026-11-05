@@ -30,14 +30,12 @@ M = {
  'skirt':   dict(color='#4d3f38', rough=.5),
  **{f'door{k}': dict(color='#5f936a', rough=.42, unlit=True) for k in 'AB'},
  **{f'handle{k}': dict(color='#b9bcbe', rough=.25, metal=1) for k in 'AB'},
- **{f'doorglass{k}': dict(map='door_glass', rough=.08, unlit=True) for k in 'AB'},
+ **{f'doorglass{k}': dict(color='#e6ecec', rough=.1, unlit=True, opacity=.62) for k in 'AB'},
  'dframe':  dict(color='#5a8a60', rough=.45, gain=.7),
  'wframe':  dict(color='#d9dbd8', rough=.4),
  'wdark':   dict(color='#3b4047', rough=.4),
  'wglass':  dict(color='#1b1f24', rough=.08),
- 'blind':   dict(map='blind', rough=1),
- 'frost':   dict(color='#d6e4e4', rough=.2, emit=2.0),
- 'sheer':   dict(color='#d8c9a6', rough=1, emit=.9),
+ 'blind':   dict(map='blind', rough=1, emit=1.7),
  'board':   dict(color='#a9abb8', rough=.16, gain=.9),
  'steel':   dict(color='#b9bcbe', rough=.25, metal=1),
  'tv':      dict(color='#08090b', rough=.1),
@@ -45,7 +43,6 @@ M = {
  'rubber':  dict(color='#111112', rough=.8),
  'led':     dict(color='#ffffff', rough=1, emit=9.0),
  'exit':    dict(map='exit', rough=1, emit=1.6),
- 'switches':dict(map='switches', rough=.5),
  'paper':   dict(color='#dcdcd6', rough=.9, unlit=True),
  'extred':  dict(color='#a81a1c', rough=.3),
  'galv':    dict(color='#8f9396', rough=.4, metal=.8),
@@ -77,20 +74,11 @@ box(0, W, D, D + TH, 0, sill, 'plaster')
 for a, b in zip(xs[0::2], xs[1::2]): box(a, b, D, D + TH, sill, head, 'plaster')
 box(4.37, 5.37, D - .4, D, 0, H, 'plaster')                # 북쪽 기둥
 box(9.25, W, D - .35, D, 0, H, 'plaster')
-# 커튼 내린 칸: 뒤에서 빛이 비침
-box(*SHEER, D + .12, D + .2, sill, head, 'sheer')
-box(SHEER[0] - .1, SHEER[1] + .1, D - .06, D - .01, .15, H - .02, 'blind')
-for x0, x1 in WINS:
-    box(x0, x1, D + .12, D + .2, sill, .9, 'frost')       # 불투명 아래 유리
-    fr = .035
-    for z0, z1 in ((sill, sill + fr), (.9, .95), (1.24, 1.3), (head - fr, head)):
-        box(x0, x1, D + .03, D + .12, z0, z1, 'wframe')
-    box(x0, x0 + fr, D + .03, D + .12, sill, head, 'wframe'); box(x1 - fr, x1, D + .03, D + .12, sill, head, 'wframe')
-    mid = (x0 + x1) / 2
-    if x1 - x0 > 1: box(mid - .03, mid + .03, D + .03, D + .12, .9, head, 'wframe')
-    for k in (x0 + .25, mid + .25 if x1 - x0 > 1 else None):
-        if k: box(k, k + .1, D + .02, D + .04, 1.2, 1.215, 'rubber')  # 손잡이
-    box(x0 - .1, x1 + .1, D - .06, D - .01, head - .05, H - .02, 'blind')
+# 블라인드: 전부 끝까지 내림. 창밖 대신 천이 낮빛으로 은은하게 비침
+for x0, x1 in [SHEER] + WINS:
+    box(x0 - .1, x1 + .1, D - .06, D - .01, .15, H - .02, 'blind')
+    box(x0 - .1, x1 + .1, D - .07, D - .06, .15, .18, 'wframe')       # 아래 무게 봉
+    sweep([(x1 + .05, D - .075, .9), (x1 + .05, D - .075, H - .03)], .002, 'white', 5)   # 줄
 # 굽도리
 SK = .1
 for a in ((0, 9.35, 0, .012), (0, 6.1, .45, .462), (6.1, 7.3, .3, .312), (7.3, 9.35, 0, .012)): pass
@@ -102,10 +90,10 @@ skirt(6.112, 7.3, .3, .312); skirt(7.3, 7.312, 0, .3); skirt(7.312, 8.2, 0, .012
 def door(x0, x1, k):
     h = DOOR_H
     box(x0 - .05, x0, 0, .03, 0, h + .05, 'dframe'); box(x1, x1 + .05, 0, .03, 0, h + .05, 'dframe'); box(x0 - .05, x1 + .05, 0, .03, h, h + .05, 'dframe')
-    box(x0, x1, 0, .015, 0, h, f'door{k}')
     gz0, gz1 = 1.28, 1.5; gx0, gx1 = x0 + .06, x1 - .06
-    box(gx0 - .012, gx1 + .012, 0, .018, gz0 - .012, gz1 + .012, f'door{k}')
-    face([(gx1, .019, gz0), (gx0, .019, gz0), (gx0, .019, gz1), (gx1, .019, gz1)], f'doorglass{k}', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
+    for a in ((x0, x1, 0, gz0), (x0, x1, gz1, h), (x0, gx0, gz0, gz1), (gx1, x1, gz0, gz1)):
+        box(a[0], a[1], 0, .015, a[2], a[3], f'door{k}')
+    face([(gx1, .008, gz0), (gx0, .008, gz0), (gx0, .008, gz1), (gx1, .008, gz1)], f'doorglass{k}', uvs=[(0, 0)] * 4)
     # 레버 손잡이 (x0 쪽)
     hx = x0 + .09
     sweep([(hx, .015, 1.0), (hx, .05, 1.0)], .028, f'handle{k}', 12)
@@ -120,9 +108,10 @@ for cx in (3.05, 1.95, .9):
     box(cx - .27, cx + .27, 0, .004, 1.85, 2.39, 'wdark')
     box(cx - .22, cx + .22, 0, .009, 1.9, 2.34, 'wglass')
     box(cx - .03, cx + .03, 0, .02, 1.9, 2.34, 'wdark'); box(cx - .08, cx - .02, 0, .05, 2.08, 2.2, 'rubber')
-# 스위치·온도조절기 사진 한 장
-face([(3.65, .006, 1.17), (3.2, .006, 1.17), (3.2, .006, 1.45), (3.65, .006, 1.45)], 'switches', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
-for sx in (7.65, 7.42): box(sx, sx + .09, 0, .012, 1.15, 1.31, 'white')
+# 스위치 판: 레버는 웹에서 달아 움직임 (전등·전등·에어컨·전등)
+SWITCHES = [{'x': 3.52, 'z': 1.31, 'kind': 'light'}, {'x': 3.28, 'z': 1.31, 'kind': 'ac'},
+            {'x': 7.695, 'z': 1.23, 'kind': 'light'}, {'x': 7.465, 'z': 1.23, 'kind': 'light'}]
+for sw in SWITCHES: box(sw['x'] - .045, sw['x'] + .045, 0, .012, sw['z'] - .07, sw['z'] + .07, 'white')
 # 기둥 표지판: 비밀번호가 보이지 않게 빈 판으로
 box(5.65, 5.83, .45, .456, 1.78, 1.92, 'white')
 # ─── 화이트보드 벽
@@ -352,4 +341,4 @@ colliders += [[-3, -.3, 3.8, 0], [4.75, -.3, 8.2, 0], [9.15, -.3, 16, 0], [-1, D
               [9.35, 0, W, 1], [6.1, 0, 7.3, .3], [5.35, 0, 6.1, .45], [4.37, D - .4, 5.37, D], [9.25, D - .35, W, D],
               [W - .62, 3.75, W, 4.75], [W - .55, 6.75, W, 7.55], [.1, .1, .3, .35]]
 
-finish((W / 2, D / 2, 1.0), 3.2, {'size': [W, D, H], 'colliders': [[round(v, 3) for v in c] for c in colliders], 'doors': DOORS})
+finish((W / 2, D / 2, 1.0), 0, {'size': [W, D, H], 'colliders': [[round(v, 3) for v in c] for c in colliders], 'doors': DOORS, 'switches': SWITCHES}, off=['led'])

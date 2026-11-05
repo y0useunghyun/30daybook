@@ -101,15 +101,6 @@ save("wood", cv2.resize(flatten(w, 90, .35), (512, 768), interpolation=cv2.INTER
 
 # ── 커튼(블라인드): 5번
 save("blind", flatten(crop(5, 880, 512, 985, 588, 512, 372), 80, .4), 85)
-# ── 창밖: 5번 위쪽 창 판을 이어 붙임(창틀 가로대는 메꿈) — 건물 밖 큰 판에 걸어 시차가 생기게
-panes = [crop(5, 884, 600, 978, 716, 470, 620), crop(5, 1004, 600, 1092, 716, 440, 620),
-         crop(5, 1340, 578, 1432, 728, 460, 620), crop(5, 1458, 578, 1548, 728, 450, 620), crop(5, 1684, 594, 1766, 730, 410, 620)]
-view = np.hstack([panes[4][:, ::-1], panes[0], panes[1], panes[2], panes[3], panes[4]])
-# 위로는 하늘, 아래로는 나무를 이어 판을 세로로 늘림 (창 가까이 가서 위아래를 봐도 끊기지 않게)
-sky = cv2.GaussianBlur(cv2.resize(view[:8], (view.shape[1], 300)), (0, 0), 30)
-save("outside", np.vstack([sky, view, view[::-1][:300]]), 84)
 # ── 작은 것들
-save("door_glass", crop(2, 2, 548, 400, 648, 800, 200), 85)
-save("switches", crop(2, 548, 712, 692, 802, 432, 270), 88)
 save("exit", rect(4, [[1036, 195], [1062.5, 183.6], [1063, 236], [1036, 247]], 120, 240), 90)
 print("textures ok", sorted(os.listdir(OUT)))

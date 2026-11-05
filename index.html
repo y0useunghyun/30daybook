@@ -201,9 +201,10 @@
   <!-- 시뮬레이션: 강의실 3D. 처음 열 때만 sim/sim.js를 불러옴 -->
   <section id="sim" class="sim" aria-label="강의실과 4호선 지하철 3D 공간. 끌어서 둘러보고 바닥을 눌러 걷습니다.">
     <p class="sim-load" role="status">강의실로 가는 중</p>
-    <p class="sim-hint"><span class="for-keys">끌어서 둘러보고, W·S나 ↑·↓로 앞뒤로 걸어요. 앞줄 책상 위 종이와 초록 문도 눌러 보세요</span><span class="for-touch">끌어서 둘러보고, 바닥을 눌러 걸어가세요. 앞줄 책상 위 종이와 초록 문도 눌러 보세요</span></p>
+    <p class="sim-hint"><span class="for-keys">끌어서 둘러보고, W·S나 방향키로 앞뒤로 걸어요. 앞줄 종이, 초록 문, 벽 스위치도 눌러 보세요</span><span class="for-touch">끌어서 둘러보고, 바닥을 눌러 걸어가세요. 앞줄 종이, 초록 문, 벽 스위치도 눌러 보세요</span></p>
     <button class="sim-take sr-only" type="button">책상 위 종이 한 장 집기</button>
     <button class="sim-door sr-only" type="button">초록 문 열고 지하철로 나가기</button>
+    <button class="sim-light sr-only" type="button">강의실 불 끄기</button>
   </section>
   <!-- 계산: 아무 앞면 한 장의 글자수 맞히기. 기회 3번, 업/다운 -->
   <section id="count" class="game" aria-label="글자수 맞히기">
@@ -295,6 +296,11 @@
   // click 대신 pointerup: 아이폰 사파리는 빈 영역 탭에 click을 안 보내서 모바일에서 안 닫혔음
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
   const SWALLOW_CLICK_MS = 400;
+  const swallowNextClick = () => {
+    const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
+    addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => removeEventListener('click', swallow, { capture: true }), SWALLOW_CLICK_MS);
+  };
   const isOpen = () => ['#result', '#mess', '#count', '#book', '#info', '#sim'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
@@ -304,10 +310,7 @@
     downAt = null;
     if (!tap || !isOpen() || !zoom.hidden) return;
     if (target?.closest('.sheets, .paper, .game-card, .books img, .info p, .zoom, .mark, .logo, .side, .sim')) return;
-    // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게 한 번 삼킴
-    const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
-    addEventListener('click', swallow, { capture: true, once: true });
-    setTimeout(() => removeEventListener('click', swallow, { capture: true }), SWALLOW_CLICK_MS);
+    swallowNextClick(); // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게
     close(e.clientX, e.clientY);
   });
   addEventListener('keydown', e => {
@@ -478,7 +481,8 @@
   const simOptions = {
     sheets: SCAN,
     paused: () => !zoom.hidden,
-    openSheet: i => openZoom('flip', `pages/front/day${pad(i + 1)}.jpg`, `pages/back/day${pad(i + 1)}.jpg`, `${i + 1}일차 지면, 누르면 뒷면`),
+    // 터치는 손을 뗀 뒤 click이 따로 와서, 방금 연 크게 보기를 바로 닫아 버림
+    openSheet: i => { swallowNextClick(); openZoom('flip', `pages/front/day${pad(i + 1)}.jpg`, `pages/back/day${pad(i + 1)}.jpg`, `${i + 1}일차 지면, 누르면 뒷면`); },
   };
   const simModule = () => simLoaded ??= import('./sim/sim.js');
   addEventListener('hashchange', onHash);

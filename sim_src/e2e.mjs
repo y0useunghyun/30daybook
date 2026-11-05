@@ -47,12 +47,33 @@ await p.mouse.click(670,180); await p.waitForTimeout(500);
 assert(await p.locator('.zoom').isVisible(),'gangway paper opens'); console.log('  통로 종이 OK', await p.locator('.zoom .front').getAttribute('src'));
 await p.keyboard.press('Escape'); await p.waitForTimeout(150);
 await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(14.8,-1.675,0,0))); await p.keyboard.down('w'); await p.waitForTimeout(2500); await p.keyboard.up('w'); c=await w();
-assert(c.x>15.4 && c.x<16.3,'walk into gangway x='+c.x); console.log('  통로 걸어 들어가 끝에서 막힘 OK x=',c.x.toFixed(2));
+assert(c.x>16.35,'walk through gangway x='+c.x); console.log('  통로 지나 앞 칸으로 OK x=',c.x.toFixed(2));
 await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(8.675,-1.5,-90,0)));await p.waitForTimeout(100);
 await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(8.675,-1.2,-90,0)));
 // 돌아서 교실로
 await p.keyboard.down('s'); await p.waitForTimeout(3600); await p.keyboard.up('s'); c = await w();
 assert(c.y > 0,'back in room y='+c.y); console.log('8 교실로 복귀 OK y=',c.y.toFixed(2));
+// 스위치: 앞에 서서 전등 레버를 누르면 불 꺼짐/켜짐, 에어컨은 전등과 별개
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(3.4,.95,-90,-14,58))); await p.waitForTimeout(400);
+await p.screenshot({path:`${out}/e_switch.jpg`,type:'jpeg',quality:82});
+const findOver = async (xs, ys) => { for (const y of ys) for (const x of xs) { await p.mouse.move(x,y); await p.waitForTimeout(25); if (await p.evaluate(()=>document.querySelector('#sim canvas').classList.contains('over-paper'))) return [x,y]; } return null; };
+let sp = await findOver([520,560,600,640],[300,340,380,420,460,500]);
+assert(sp,'switch hover'); let s0=await w(); await p.mouse.click(...sp); await p.waitForTimeout(300); let s1=await w();
+assert(s0.lights!==s1.lights || s0.ac!==s1.ac,'switch flips'); console.log('  스위치 OK', JSON.stringify([s0.lights,s0.ac]),'→',JSON.stringify([s1.lights,s1.ac]));
+await p.evaluate(()=>document.querySelector('.sim-light').click()); await p.waitForTimeout(200); const lt=(await w()).lights;
+if (lt) { await p.evaluate(()=>document.querySelector('.sim-light').click()); await p.waitForTimeout(200); }
+assert.equal((await w()).lights,false);
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(.55,.75,40,-8,54))); await p.waitForTimeout(400); await p.screenshot({path:`${out}/e_dark.jpg`,type:'jpeg',quality:82});
+await p.evaluate(()=>document.querySelector('.sim-light').click()); await p.waitForTimeout(200); assert.equal((await w()).lights,true); console.log('  불 끄기/켜기 OK');
+// 3량: 앞뒤 칸까지 걸어가고 끝에서 막힘
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(15.3,-1.675,0,0))); await p.keyboard.down('w'); await p.waitForTimeout(2600); await p.keyboard.up('w'); c=await w();
+assert(c.x>17.5,'east car x='+c.x); console.log('  앞 칸 진입 OK x=',c.x.toFixed(2));
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(-1.5,-1.675,180,0))); await p.keyboard.down('w'); await p.waitForTimeout(2600); await p.keyboard.up('w'); c=await w();
+assert(c.x<-3.5,'west car x='+c.x); console.log('  뒤 칸 진입 OK x=',c.x.toFixed(2));
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(33.5,-1.675,0,0))); await p.keyboard.down('w'); await p.waitForTimeout(1800); await p.keyboard.up('w'); c=await w();
+assert(c.x<34.95,'east end blocked x='+c.x); console.log('  맨 앞 끝 막힘 OK x=',c.x.toFixed(2)); await p.screenshot({path:`${out}/e_end.jpg`,type:'jpeg',quality:80});
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(-20.6,-1.675,180,0))); await p.keyboard.down('w'); await p.waitForTimeout(1500); await p.keyboard.up('w'); c=await w();
+assert(c.x>-21.1,'west end blocked x='+c.x); console.log('  맨 뒤 끝 막힘 OK x=',c.x.toFixed(2));
 // 9) 닫힌 다른 문은 벽처럼 막힘
 await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(4.275,.6,-90,0))); await p.keyboard.down('w'); await p.waitForTimeout(1200); await p.keyboard.up('w'); c = await w();
 assert(c.y >= .1,'closed door blocks y='+c.y); console.log('9 닫힌 문 막힘 OK y=',c.y.toFixed(2));
