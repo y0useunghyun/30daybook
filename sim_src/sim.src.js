@@ -325,7 +325,14 @@ async function build(root, opts) {
   });
   { // 객차 반대편 문 → 내 방. 경첩 없이 객차 문만 밀림
     const proxy = new THREE.Mesh(new THREE.BoxGeometry(MY_DOOR.leafX, 2, .2)); proxy.position.copy(toThree((MY_DOOR.x0 + MY_DOOR.x1) / 2, MY_DOOR.wallY, 1)); proxy.visible = false; scene.add(proxy);
-    doors.push({ ...MY_DOOR, mid: (MY_DOOR.x0 + MY_DOOR.x1) / 2, proxy, leaves: [], open: false, t: 0 });
+    // 어느 문인지 바로 보이게 「집」 표시 (열리면 사라짐)
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const g = c.getContext('2d'); g.fillStyle = '#f6f5f0'; g.fillRect(0, 0, 256, 128);
+    g.font = '500 76px SUIT, sans-serif'; g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('집', 128, 70);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(.3, .15), new THREE.MeshBasicMaterial({ map: tex }));
+    sign.position.copy(toThree((MY_DOOR.x0 + MY_DOOR.x1) / 2, MY_DOOR.wallY - .012, 1.72)); sign.rotation.y = Math.PI; sign.visible = false; scene.add(sign);
+    doors.push({ ...MY_DOOR, mid: (MY_DOOR.x0 + MY_DOOR.x1) / 2, proxy, sign, leaves: [], open: false, t: 0 });
   }
   let subway = null, train = null, trainColliders = [], gangway = null, myColliders = [], myRoom = null, carClones = [], deskPile = null;
   // 내 방: 객차가 온 뒤 이어서 불러옴
@@ -401,6 +408,7 @@ async function build(root, opts) {
     if (d.south) { await myRoomReady(); myRoom.visible = true; }
     train.visible = true; gangway.group.visible = true; lastView = ''; invalidate();
     d.open = true; rebuildColliders();
+    doors.forEach(v => { if (v.sign) v.sign.visible = !v.open; });
     if (reducedMotion) { d.t = 1; applyDoor(d); }
   };
 

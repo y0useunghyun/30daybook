@@ -44,6 +44,7 @@ M = {
  'sill':    dict(color='#cfd1d2', rough=.5),
  'alu':     dict(color='#a7aaad', rough=.35, metal=.9),
  **{f'leaf{k}': dict(color='#c6c8c9', rough=.36, metal=.25, gain=.85) for k in ('AL', 'AR', 'BL', 'BR', 'CL', 'CR')},
+ **{f'leaf{k}': dict(color='#5f936a', rough=.42, gain=1.0) for k in ('CL', 'CR')},   # 방으로 가는 문: 교실 문과 같은 초록
  **{f'glass{k}': dict(color='#6f7276', rough=.1, unlit=True) for k in ('AL', 'AR', 'BL', 'BR', 'CL', 'CR')},
 }
 exec(open(os.path.join(os.path.dirname(TEX), 'kit.py')).read())
