@@ -67,6 +67,25 @@
   }
   .paper.dragging { cursor: grabbing; }
 
+  /* 시뮬레이션: 화면 전체 강의실. 로고·메뉴만 위에 뜸 */
+  .sim { display: none; position: fixed; inset: 0; z-index: 8; background: #fff; }
+  .sim:target { display: block; }
+  .sim:focus { outline: none; }
+  .sim canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .sim canvas.dragging { cursor: grabbing; }
+  .sim canvas.over-paper:not(.dragging) { cursor: pointer; }
+  .sim-load, .sim-hint { position: absolute; left: 0; right: 0; margin: 0; text-align: center; font-size: 15px; pointer-events: none; }
+  .sim-load { top: 50%; }
+  .sim.ready .sim-load { display: none; }
+  .sim.failed .sim-load { font-size: 0; }
+  .sim.failed .sim-load::after { content: "이 브라우저에선 강의실을 열 수 없어요"; font-size: 15px; }
+  .sim-hint { bottom: 24px; color: #000; display: none; z-index: 1; }
+  .sim-hint span { background: #fff; padding: 4px 10px; }
+  .sim-hint .for-touch { display: none; }
+  @media not (pointer: fine) { .sim-hint .for-keys { display: none; } .sim-hint .for-touch { display: inline; } }
+  .sim.ready .sim-hint { display: block; }
+  .sim-hint.gone { display: none !important; }
+
   /* INFO·BOOK: 로고 메뉴의 그 줄(INFO/BOOK 글자) 높이에 윗선 맞춰 메뉴 오른쪽으로. top은 JS가 --row-top */
   .books, .info {
     display: none; position: fixed; z-index: 8; left: 168px; top: var(--row-top, 200px);
@@ -177,7 +196,15 @@
     <a class="mark" href="#result" aria-label="결과물 — 30일치 지면 보기" style="left:57.4%; top:32.3%; width:5.7%; height:4.2%"></a>
     <a class="mark" href="#mess" aria-label="복잡 — 모든 종이 쏟기" style="left:67.8%; top:32.3%; width:4.6%; height:3.4%"></a>
     <a class="mark" href="#count" aria-label="계산 — 글자수 맞히기" style="left:38.7%; top:48.3%; width:3.9%; height:3.4%"></a>
+    <a class="mark" href="#sim" aria-label="시뮬레이션 — 처음 책을 읽은 강의실과 4호선 지하철 걸어 보기" style="left:65.9%; top:42.1%; width:8.1%; height:3.5%"></a>
   </main>
+  <!-- 시뮬레이션: 강의실 3D. 처음 열 때만 sim/sim.js를 불러옴 -->
+  <section id="sim" class="sim" aria-label="강의실과 4호선 지하철 3D 공간. 끌어서 둘러보고 바닥을 눌러 걷습니다.">
+    <p class="sim-load" role="status">강의실로 가는 중</p>
+    <p class="sim-hint"><span class="for-keys">끌어서 둘러보고, W·S나 ↑·↓로 앞뒤로 걸어요. 앞줄 책상 위 종이와 초록 문도 눌러 보세요</span><span class="for-touch">끌어서 둘러보고, 바닥을 눌러 걸어가세요. 앞줄 책상 위 종이와 초록 문도 눌러 보세요</span></p>
+    <button class="sim-take sr-only" type="button">책상 위 종이 한 장 집기</button>
+    <button class="sim-door sr-only" type="button">초록 문 열고 지하철로 나가기</button>
+  </section>
   <!-- 계산: 아무 앞면 한 장의 글자수 맞히기. 기회 3번, 업/다운 -->
   <section id="count" class="game" aria-label="글자수 맞히기">
     <div class="game-card">
@@ -268,7 +295,7 @@
   // click 대신 pointerup: 아이폰 사파리는 빈 영역 탭에 click을 안 보내서 모바일에서 안 닫혔음
   const TAP_SLOP_PX = 6; // 이보다 많이 움직이면 누름이 아니라 끌기
   const SWALLOW_CLICK_MS = 400;
-  const isOpen = () => ['#result', '#mess', '#count', '#book', '#info'].includes(location.hash);
+  const isOpen = () => ['#result', '#mess', '#count', '#book', '#info', '#sim'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
   addEventListener('pointerup', e => {
@@ -276,7 +303,7 @@
     const target = downAt?.target; // 캡처 중이면 e.target이 바뀌어서 누른 곳 기준
     downAt = null;
     if (!tap || !isOpen() || !zoom.hidden) return;
-    if (target?.closest('.sheets, .paper, .game-card, .books img, .info p, .zoom, .mark, .logo, .side')) return;
+    if (target?.closest('.sheets, .paper, .game-card, .books img, .info p, .zoom, .mark, .logo, .side, .sim')) return;
     // 닫은 뒤 따라오는 click이 아래 동그라미 등을 누르지 않게 한 번 삼킴
     const swallow = ev => { ev.preventDefault(); ev.stopPropagation(); };
     addEventListener('click', swallow, { capture: true, once: true });
@@ -442,7 +469,18 @@
     if (location.hash === '#info' || location.hash === '#book') alignToMenuRow();
     if (location.hash === '#mess') dropPapers();
     if (location.hash === '#count') newRound();
+    // 강의실은 무거워서 처음 들어갈 때 불러오고, 나오면 그리기를 멈춤
+    if (location.hash === '#sim') simModule().then(m => m.open(document.getElementById('sim'), simOptions), () => document.getElementById('sim').classList.add('failed'));
+    else if (simLoaded) simLoaded.then(m => m.close(), () => {});
   };
+  let simLoaded = null;
+  // 강의실 책상 위 종이를 집으면 띠와 같은 크게 보기로 (누르면 뒷면, 바깥 누르면 내려놓음)
+  const simOptions = {
+    sheets: SCAN,
+    paused: () => !zoom.hidden,
+    openSheet: i => openZoom('flip', `pages/front/day${pad(i + 1)}.jpg`, `pages/back/day${pad(i + 1)}.jpg`, `${i + 1}일차 지면, 누르면 뒷면`),
+  };
+  const simModule = () => simLoaded ??= import('./sim/sim.js');
   addEventListener('hashchange', onHash);
   onHash();
 
@@ -563,7 +601,7 @@
 
   addEventListener('wheel', e => {
     // 크게 보기·복잡·글자수 게임 중엔 뒤 배경 안 움직임
-    if (!zoom.hidden || ['#mess', '#count', '#book', '#info'].includes(location.hash)) { e.preventDefault(); return; }
+    if (!zoom.hidden || ['#mess', '#count', '#book', '#info', '#sim'].includes(location.hash)) { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;

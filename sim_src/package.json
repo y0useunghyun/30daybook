@@ -1,0 +1,1 @@
+{"private":true,"scripts":{"build":"esbuild sim.src.js --bundle --minify --format=esm --target=es2020 --outfile=../sim/sim.js"},"dependencies":{"three":"0.187.0"},"devDependencies":{"esbuild":"^0.25.0","playwright-core":"^1.64.1"}}
