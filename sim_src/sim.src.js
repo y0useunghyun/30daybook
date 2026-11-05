@@ -7,15 +7,18 @@ const BASE = new URL('.', import.meta.url).href;
 const EYE = 1.5, RADIUS = .2, WALK_SPEED = 1.5, TURN_PER_PX = .0032, WHEEL_STEP = .0025, TAP_SLOP_PX = 6;
 const PITCH_MAX = 1.35;
 const SPAWN = { x: 2.15, y: .95, yaw: 62 * Math.PI / 180, pitch: -.1 }; // 8번 사진 자리
-const BOUNDS_Y0 = -2.85; // 객차 남쪽 끝
+const BOUNDS_Y0 = -2.85, MY_ROOM_Y0 = -7.05; // 객차 남쪽 끝, 내 방 창가
 const SOUTH_AISLE_Y = .95, EAST_AISLE_X = 6.6;                          // 책상 줄을 건널 수 있는 통로
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// 앞줄 왼쪽(창 쪽)에서 세 번째 책상. 책상을 바꾸려면 x·y만 고치면 됨
-const PILE = { x: 7.75, y: 6.1, z: .792, spread: .3, gap: .0014, sheetW: .2, reach: 2.4 };
+// 맨 앞줄 접이식 책상 중 가운데. 책상을 바꾸려면 x·y만 고치면 됨
+const PILE = { x: 7.75, y: 4.6, z: .792, spread: .3, gap: .0014, sheetW: .2, reach: 2.4 };
 const DOOR_OPEN_RAD = -95 * Math.PI / 180, DOOR_MS = 900, LEAF_SLIDE = .66, DOOR_REACH = 1.7, DOOR_STAND = .72;
 const GANGWAY = { cols: 5, rowZ: [1.68, 1.36, 1.04], sheetW: .178, off: .03, reach: 1.5, color: 0xdedcd4 };
+const MY_DOOR = { id: 'C', x0: 8.2, x1: 9.15, south: true, wallY: -3.05, stand: -2.3, leafX: 1.28 };
+const VIEW = { width: 24, dist: 12, zc: 1.5, aspect: 580 / 900 };
 const SWITCH = { reach: 1.7, tilt: .32, stand: .85, dimUnlit: .4, dimLed: 0x77797a, dimEnv: .25 };
+const DESK_SHEET_W = .19, DESK_REACH = 1.5, DESK_STAND = { x: 9.05, y: -5.88 };
 const LCD_MS = 6000, SETTLE_MS = 1500;
 const STATIONS = '진접 오남 별내별가람 당고개 상계 노원 창동 쌍문 수유 미아 미아사거리 길음 성신여대입구 한성대입구 혜화 동대문 동대문역사문화공원 충무로 명동 회현 서울역 숙대입구 삼각지 신용산 이촌 동작 총신대입구 사당 남태령 선바위 경마공원 대공원 과천 정부과천청사 인덕원 평촌 범계 금정 산본 수리산 대야미 반월 상록수 한대앞 중앙 고잔 초지 안산 신길온천 정왕 오이도'.split(' ');
 
@@ -23,6 +26,25 @@ const STATIONS = '진접 오남 별내별가람 당고개 상계 노원 창동 �
 const toThree = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 let ui = null; // 한 번 지으면 재사용
+
+// 통신이 잠깐 끊겨도 공간이 안 열리는 일이 없게 몇 번 다시 받음
+const RETRIES = 3, RETRY_MS = 500;
+async function retry(load) {
+  for (let i = 0; ; i++) {
+    try { return await load(); } catch (err) {
+      if (i >= RETRIES) throw err;
+      await new Promise(r => setTimeout(r, RETRY_MS * (i + 1)));
+    }
+  }
+}
+// 나중에 채워지는 질감도 실패하면 다시 받음
+function loadTexture(loader, url, tries = RETRIES) {
+  const tex = new THREE.Texture();
+  const attempt = left => loader.load(url, t => { tex.image = t.image; tex.needsUpdate = true; }, undefined,
+    () => { if (left > 0) setTimeout(() => attempt(left - 1), RETRY_MS); });
+  attempt(tries);
+  return tex;
+}
 
 function collide(p, rects) {
   let { x, y } = p;
@@ -43,10 +65,10 @@ function collide(p, rects) {
 async function loadPart(dir, renderer, loader, extra = () => null) {
   const url = `${BASE}${dir}`;
   const [meta, gltf, lightMap, envRaw] = await Promise.all([
-    fetch(`${url}scene.json`).then(r => { if (!r.ok) throw new Error(`${dir}scene.json ${r.status}`); return r.json(); }),
-    new GLTFLoader().loadAsync(`${url}room.glb`),
-    loader.loadAsync(`${url}lightmap.webp`),
-    loader.loadAsync(`${url}env.jpg`),
+    retry(() => fetch(`${url}scene.json`).then(r => { if (!r.ok) throw new Error(`${dir}scene.json ${r.status}`); return r.json(); })),
+    retry(() => new GLTFLoader().loadAsync(`${url}room.glb`)),
+    retry(() => loader.loadAsync(`${url}lightmap.webp`)),
+    retry(() => loader.loadAsync(`${url}env.jpg`)),
   ]);
   lightMap.colorSpace = THREE.SRGBColorSpace; lightMap.flipY = false; lightMap.channel = 1;
   lightMap.generateMipmaps = false; lightMap.minFilter = lightMap.magFilter = THREE.LinearFilter;
@@ -54,7 +76,7 @@ async function loadPart(dir, renderer, loader, extra = () => null) {
   const pm = new THREE.PMREMGenerator(renderer); const env = pm.fromEquirectangular(envRaw).texture; pm.dispose();
   const anisotropy = renderer.capabilities.getMaxAnisotropy();
   const tex = name => {
-    const t = loader.load(`${url}tex/${name}.jpg`);
+    const t = loadTexture(loader, `${url}tex/${name}.jpg`);
     t.colorSpace = THREE.SRGBColorSpace; t.flipY = false;
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = anisotropy;
     return t;
@@ -87,7 +109,7 @@ async function loadPart(dir, renderer, loader, extra = () => null) {
     o.matrixAutoUpdate = false; o.frustumCulled = false;
   });
   // 불 켜기/끄기: 구운 빛 지도를 바꿔 끼움. 스스로 빛나는 것(블라인드·비상구)은 그대로
-  const lightMapOff = meta.lightmapOff ? await loader.loadAsync(`${url}lightmap_off.webp`) : null;
+  const lightMapOff = meta.lightmapOff ? await retry(() => loader.loadAsync(`${url}lightmap_off.webp`)) : null;
   if (lightMapOff) { lightMapOff.colorSpace = THREE.SRGBColorSpace; lightMapOff.flipY = false; lightMapOff.channel = 1; lightMapOff.generateMipmaps = false; lightMapOff.minFilter = lightMapOff.magFilter = THREE.LinearFilter; }
   const setLights = on => {
     for (const [name, m] of Object.entries(cache)) {
@@ -105,7 +127,7 @@ async function loadPart(dir, renderer, loader, extra = () => null) {
 function makePile(scene, loader, sizes) {
   const maxW = Math.max(...sizes.map(s => s[0]));
   const maps = sizes.map((_, i) => {
-    const map = loader.load(`${BASE}../pages/small/front${String(i + 1).padStart(2, '0')}.jpg`);
+    const map = loadTexture(loader, `${BASE}../pages/small/front${String(i + 1).padStart(2, '0')}.jpg`);
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
     return map;
   });
@@ -202,6 +224,27 @@ function makeSwitches(scene, list) {
   });
 }
 
+// 방 책상 위 30장: 누르면 맨 위를 크게 보고 맨 아래로 넣음
+function makeDeskPile(group, desk, maps, sizes) {
+  const maxW = Math.max(...sizes.map(s => s[0]));
+  const order = sizes.map((_, i) => i);
+  const meshes = sizes.map(([w, h], i) => {
+    const sw = DESK_SHEET_W * w / maxW;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(sw, sw * h / w).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: maps[i], color: 0xf2f0e8 }));
+    m.rotation.y = -Math.PI / 2 + (Math.random() - .5) * .3;
+    m.userData.dx = (Math.random() - .5) * .018; m.userData.dy = (Math.random() - .5) * .018;
+    group.add(m);
+    return m;
+  });
+  const layout = () => order.forEach((day, j) => {
+    const m = meshes[day], up = order.length - j;
+    m.position.copy(toThree(desk.x + m.userData.dx, desk.y + m.userData.dy, desk.z + up * PILE.gap));
+  });
+  layout();
+  const proxy = new THREE.Mesh(new THREE.BoxGeometry(.3, .07, .34)); proxy.position.copy(toThree(desk.x, desk.y, desk.z + .02)); proxy.visible = false; group.add(proxy);
+  return { proxy, take() { const day = order.shift(); order.push(day); layout(); return day; } };
+}
+
 function makeLcd() {
   const canvas = document.createElement('canvas'); canvas.width = 840; canvas.height = 64;
   const g = canvas.getContext('2d');
@@ -242,7 +285,7 @@ async function build(root, opts) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   const scene = new THREE.Scene(); scene.background = new THREE.Color('#dfe6ea');
-  const camera = new THREE.PerspectiveCamera(58, 1, .05, 120);
+  const camera = new THREE.PerspectiveCamera(58, 1, .08, 120);
   const loader = new THREE.TextureLoader();
 
   const room = await loadPart('', renderer, loader);
@@ -280,7 +323,24 @@ async function build(root, opts) {
     proxy.position.copy(toThree((d.x0 + d.x1) / 2, -.15, 1.12)); proxy.visible = false; scene.add(proxy);
     return { ...d, mid: (d.x0 + d.x1) / 2, pivot, proxy, leaves: [], open: false, t: 0 };
   });
-  let subway = null, train = null, trainColliders = [], gangway = null;
+  { // 객차 반대편 문 → 내 방. 경첩 없이 객차 문만 밀림
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(MY_DOOR.leafX, 2, .2)); proxy.position.copy(toThree((MY_DOOR.x0 + MY_DOOR.x1) / 2, MY_DOOR.wallY, 1)); proxy.visible = false; scene.add(proxy);
+    doors.push({ ...MY_DOOR, mid: (MY_DOOR.x0 + MY_DOOR.x1) / 2, proxy, leaves: [], open: false, t: 0 });
+  }
+  let subway = null, train = null, trainColliders = [], gangway = null, myColliders = [], myRoom = null, carClones = [], deskPile = null;
+  // 내 방: 객차가 온 뒤 이어서 불러옴
+  const myRoomReady = () => myRoomLoad ??= loadPart('myroom/', renderer, loader).then(part => {
+    myRoom = new THREE.Group(); myRoom.visible = false; myRoom.add(part.root); scene.add(myRoom);
+    part.root.traverse(o => { if (o.userData.mat === 'plug') o.visible = false; });
+    myColliders = part.meta.colliders; rebuildColliders();
+    const [wx0, wx1, wy] = part.meta.window;
+    const map = loadTexture(loader, `${BASE}myroom/tex/view.jpg`); map.colorSpace = THREE.SRGBColorSpace;
+    const view = new THREE.Mesh(new THREE.PlaneGeometry(VIEW.width, VIEW.width * VIEW.aspect), new THREE.MeshBasicMaterial({ map }));
+    view.position.copy(toThree((wx0 + wx1) / 2, wy - VIEW.dist, VIEW.zc)); view.rotation.y = Math.PI; myRoom.add(view); // 앞면이 방을 보게
+    deskPile = makeDeskPile(myRoom, part.meta.desk, pile.maps, opts.sheets);
+    return part;
+  });
+  let myRoomLoad = null;
   const bounds = { x0: .2, x1: W - .2 };
   const lcd = makeLcd();
   const subwayReady = loadPart('subway/', renderer, loader, name => {
@@ -298,8 +358,9 @@ async function build(root, opts) {
     });
     showEnds(part.root, false, false); showEnds(back, false, true); showEnds(front, true, false);
     train = new THREE.Group(); train.visible = false; train.add(part.root, back, front); scene.add(train);
+    carClones = [back, front];
     part.root.traverse(o => {
-      const m = o.userData.mat?.match(/^(?:leaf|glass)([AB])([LR])$/);
+      const m = o.userData.mat?.match(/^(?:leaf|glass)([ABC])([LR])$/);
       if (!m) return;
       o.matrixAutoUpdate = true;
       doors.find(d => d.id === m[1]).leaves.push({ mesh: o, dir: m[2] === 'L' ? -1 : 1 });
@@ -307,7 +368,8 @@ async function build(root, opts) {
     gangway = { ...part.meta.gangway, ...makeGangwayPapers(scene, part.meta.gangway, pile.maps, opts.sheets) };
     const shift = (c, dx) => [c[0] + dx, c[1], c[2] + dx, c[3]];
     const { carX0, carYN: yn, carYS: ys } = part.meta;
-    const noHoles = dx => room.meta.doors.map(d => [d.x0 + dx, yn, d.x1 + dx, yn + .05]); // 앞뒤 칸 문은 안 열림
+    const sd = part.meta.southDoor;
+    const noHoles = dx => [...room.meta.doors.map(d => [d.x0 + dx, yn, d.x1 + dx, yn + .05]), [sd.x0 + dx, ys - .3, sd.x1 + dx, ys]]; // 앞뒤 칸 문은 안 열림
     const walkLimit = { x0: carX0 - P + RADIUS, x1: part.meta.gangway.x1 + P - RADIUS };
     trainColliders = [
       ...part.meta.colliders,
@@ -316,6 +378,7 @@ async function build(root, opts) {
     ];
     Object.assign(bounds, walkLimit);
     rebuildColliders();
+    myRoomReady().catch(console.error); // 문 누르면 바로 열리게 미리
     return part;
   });
   subwayReady.catch(console.error);
@@ -324,17 +387,18 @@ async function build(root, opts) {
   let colliders = [];
   // 닫힌 문은 벽처럼 막음. 객차가 아직 안 왔으면 문은 안 열림
   function rebuildColliders() {
-    colliders = [...room.meta.colliders, ...trainColliders, ...doors.filter(d => !d.open).map(d => [d.x0, -.3, d.x1, 0])];
+    colliders = [...room.meta.colliders, ...trainColliders, ...myColliders, ...doors.filter(d => !d.open).map(d => d.south ? [d.x0, -3.35, d.x1, d.wallY] : [d.x0, -.3, d.x1, 0])];
   }
   rebuildColliders();
   const applyDoor = d => {
     const e = d.t * d.t * (3 - 2 * d.t);
-    d.pivot.rotation.y = DOOR_OPEN_RAD * e;
+    if (d.pivot) d.pivot.rotation.y = DOOR_OPEN_RAD * e;
     d.leaves.forEach(l => { l.mesh.position.x = l.dir * LEAF_SLIDE * e; });
   };
   const openDoor = async d => {
     if (d.open) return;
     await subwayReady;
+    if (d.south) { await myRoomReady(); myRoom.visible = true; }
     train.visible = true; gangway.group.visible = true; lastView = ''; invalidate();
     d.open = true; rebuildColliders();
     if (reducedMotion) { d.t = 1; applyDoor(d); }
@@ -366,7 +430,9 @@ async function build(root, opts) {
     state.goal = { ...first, stuck: 0, then: () => walkRoute(rest, done) };
   };
   const inCar = () => state.y < -.15;
-  const openDoorNear = () => doors.filter(d => d.open).sort((a, b) => Math.abs(a.mid - state.x) - Math.abs(b.mid - state.x))[0];
+  const inMyRoom = () => state.y < -3.05;
+  const leaveMyRoom = () => inMyRoom() ? [{ x: MY_DOOR.x0 + .475, y: MY_DOOR.stand }] : [];
+  const openDoorNear = () => doors.filter(d => d.open && !d.south).sort((a, b) => Math.abs(a.mid - state.x) - Math.abs(b.mid - state.x))[0];
 
   const pickSheet = () => {
     // 집을 때 더미 쪽을 보게 (크게 보기가 바로 덮어서 안 튐)
@@ -382,7 +448,7 @@ async function build(root, opts) {
     const fromCar = inCar() && openDoorNear();
     const toRoom = fromCar ? [{ x: fromCar.mid, y: -DOOR_STAND }, { x: fromCar.mid, y: DOOR_STAND }] : [];
     const startX = fromCar ? fromCar.mid : state.x;
-    walkRoute([...toRoom, { x: startX, y: SOUTH_AISLE_Y }, { x: EAST_AISLE_X, y: SOUTH_AISLE_Y }, { x: EAST_AISLE_X, y: PILE.y }], pickSheet);
+    walkRoute([...leaveMyRoom(), ...toRoom, { x: startX, y: SOUTH_AISLE_Y }, { x: EAST_AISLE_X, y: SOUTH_AISLE_Y }, { x: EAST_AISLE_X, y: PILE.y }], pickSheet);
   };
   const readPaper = (day, x, y) => {
     interacted();
@@ -390,7 +456,18 @@ async function build(root, opts) {
     if (Math.hypot(x - state.x, y - state.y) <= GANGWAY.reach) return open();
     const door = !inCar() && openDoorNear();
     const toCar = door ? [{ x: door.mid, y: DOOR_STAND }, { x: door.mid, y: -DOOR_STAND }] : [];
-    walkRoute([...toCar, { x: gangway.x0 - .4, y: gangway.yc }, { x: (gangway.x0 + gangway.x1) / 2, y: gangway.yc }], open);
+    walkRoute([...leaveMyRoom(), ...toCar, { x: gangway.x0 - .4, y: gangway.yc }, { x: (gangway.x0 + gangway.x1) / 2, y: gangway.yc }], open);
+  };
+  const reachDesk = () => {
+    interacted();
+    const read = () => {
+      const dx = DESK_STAND.x + .59 - state.x, dy = DESK_STAND.y - state.y;
+      state.yaw = Math.atan2(dy, dx); state.pitch = Math.atan2(.74 - EYE, Math.hypot(dx, dy));
+      lastView = ''; opts.openSheet(deskPile.take());
+    };
+    if (Math.hypot(DESK_STAND.x + .59 - state.x, DESK_STAND.y - state.y) <= DESK_REACH) return read();
+    const way = inMyRoom() ? [] : [{ x: MY_DOOR.x0 + .475, y: MY_DOOR.stand }, { x: MY_DOOR.x0 + .475, y: -3.7 }];
+    walkRoute([...way, DESK_STAND], read);
   };
   const reachSwitch = sw => {
     interacted();
@@ -400,16 +477,27 @@ async function build(root, opts) {
   };
   const reachDoor = d => {
     interacted();
-    const fromCar = inCar();
-    const near = Math.hypot(d.mid - state.x, -.15 - state.y) <= DOOR_REACH;
-    if (near) { openDoor(d); return; }
-    if (fromCar) { walkRoute([{ x: d.mid, y: -DOOR_STAND - .3 }], () => openDoor(d)); return; }
+    const wallY = d.south ? d.wallY : -.15;
+    if (Math.hypot(d.mid - state.x, wallY - state.y) <= DOOR_REACH) { openDoor(d); return; }
+    if (d.south) {
+      const via = openDoorNear();
+      const toCar = !inCar() && via ? [{ x: via.mid, y: DOOR_STAND }, { x: via.mid, y: -DOOR_STAND }] : [];
+      walkRoute([...toCar, { x: d.mid, y: d.stand }], () => openDoor(d));
+      return;
+    }
+    if (inCar()) { walkRoute([...leaveMyRoom(), { x: d.mid, y: -DOOR_STAND - .3 }], () => openDoor(d)); return; }
     walkRoute([{ x: state.x, y: SOUTH_AISLE_Y }, { x: d.mid, y: DOOR_STAND }], () => openDoor(d));
   };
   root.querySelector('.sim-take')?.addEventListener('click', pickSheet);
+  root.querySelector('.sim-myroom')?.addEventListener('click', () => {
+    const d = doors.find(v => v.south);
+    state.x = d.mid; state.y = d.stand; state.yaw = -Math.PI / 2; state.pitch = 0;
+    if (!doors.some(v => v.open)) openDoor(doors.find(v => !v.south && v.id === 'B'));
+    openDoor(d);
+  });
   root.querySelector('.sim-light')?.addEventListener('click', () => setLights(!sim.lights));
   root.querySelector('.sim-door')?.addEventListener('click', () => {
-    const d = doors.find(v => !v.open) ?? doors[0];
+    const d = doors.find(v => !v.open && !v.south) ?? doors[0];
     state.x = d.mid; state.y = .72; state.yaw = -Math.PI / 2; state.pitch = 0;
     openDoor(d);
   });
@@ -424,10 +512,12 @@ async function build(root, opts) {
   const targetUnderRay = () => {
     const closed = doors.filter(d => !d.open);
     const papers = gangway?.group.visible ? gangway.papers : [];
-    const hits = ray.intersectObjects([pile.proxy, ...closed.map(d => d.proxy), ...papers, ...switches.map(v => v.proxy)], false);
+    const deskHit = deskPile && myRoom.visible ? [deskPile.proxy] : [];
+    const hits = ray.intersectObjects([pile.proxy, ...closed.map(d => d.proxy), ...papers, ...switches.map(v => v.proxy), ...deskHit], false);
     if (!hits.length) return null;
     const o = hits[0].object;
     if (o === pile.proxy) return { pile: true };
+    if (deskPile && o === deskPile.proxy) return { desk: true };
     if (o.userData.day !== undefined) return { paper: o };
     const sw = switches.find(v => v.proxy === o);
     if (sw) return { sw };
@@ -455,11 +545,12 @@ async function build(root, opts) {
     aim(e);
     const target = targetUnderRay();
     if (target?.pile) return reachPile();
+    if (target?.desk) return reachDesk();
     if (target?.door) return reachDoor(target.door);
     if (target?.sw) return reachSwitch(target.sw);
     if (target?.paper) { const p = target.paper.position; return readPaper(target.paper.userData.day, p.x, -p.z); }
     if (ray.ray.intersectPlane(floorPlane, hit)) {
-      state.goal = { x: Math.max(bounds.x0, Math.min(bounds.x1, hit.x)), y: Math.max(BOUNDS_Y0, Math.min(D - .2, -hit.z)), stuck: 0 };
+      state.goal = { x: Math.max(bounds.x0, Math.min(bounds.x1, hit.x)), y: Math.max(myRoom?.visible ? MY_ROOM_Y0 : BOUNDS_Y0, Math.min(D - .2, -hit.z)), stuck: 0 };
       interacted();
     }
   };
@@ -513,6 +604,7 @@ async function build(root, opts) {
     if (view !== lastView || doors.some(d => d.open && d.t < 1) || t < redrawUntil) {
       lastView = view;
       if (refl) refl.visible = state.y > -.3; // 객차 안에선 교실 바닥 반사 끔
+      carClones.forEach(c => { c.visible = state.y > -3.1; }); // 방 안에선 앞뒤 칸 안 그림
       applyCamera();
       renderer.render(scene, camera);
     }

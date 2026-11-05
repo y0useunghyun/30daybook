@@ -60,9 +60,10 @@ def extrude_x(profile, x0, x1, mat, us=.4, T=None, smooth=True):
         f = bm.faces.new((a_[i], b_[i], b_[j], a_[j])); f.material_index = idx[mat]; f.smooth = smooth
         for l, uv in zip(f.loops, ((x0 / us, run / us), (x1 / us, run / us), (x1 / us, (run + L) / us), (x0 / us, (run + L) / us))): l[uvl].uv = uv
         run += L
-    for vs in (a_[::-1], b_):
+    # 단면은 시계 방향(y→, z↑)으로 줌. 양끝 면이 바깥을 보게
+    for vs, pr_ in ((a_, profile), (b_[::-1], profile[::-1])):
         f = bm.faces.new(vs); f.material_index = idx[mat]
-        for l, p in zip(f.loops, (profile[::-1] if vs is not b_ else profile)): l[uvl].uv = (p[0] / us, p[1] / us)
+        for l, p in zip(f.loops, pr_): l[uvl].uv = (p[0] / us, p[1] / us)
 
 def srgb(h):
     v = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]

@@ -43,8 +43,8 @@ M = {
  'caution': dict(map='caution', rough=.5),
  'sill':    dict(color='#cfd1d2', rough=.5),
  'alu':     dict(color='#a7aaad', rough=.35, metal=.9),
- **{f'leaf{k}': dict(color='#c6c8c9', rough=.36, metal=.25, gain=.85) for k in ('AL', 'AR', 'BL', 'BR')},
- **{f'glass{k}': dict(color='#6f7276', rough=.1, unlit=True) for k in ('AL', 'AR', 'BL', 'BR')},
+ **{f'leaf{k}': dict(color='#c6c8c9', rough=.36, metal=.25, gain=.85) for k in ('AL', 'AR', 'BL', 'BR', 'CL', 'CR')},
+ **{f'glass{k}': dict(color='#6f7276', rough=.1, unlit=True) for k in ('AL', 'AR', 'BL', 'BR', 'CL', 'CR')},
 }
 exec(open(os.path.join(os.path.dirname(TEX), 'kit.py')).read())
 colliders = []
@@ -133,7 +133,7 @@ def door_at(c, north, key=None):
     face(pts if north else pts[::-1], 'lcd', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)] if north else [(1, 1), (0, 1), (0, 0), (1, 0)])
 for c in DC:
     door_at(c, True, 'A' if c == 4.275 else 'B' if c == 8.675 else None)
-    door_at(c, False)
+    door_at(c, False, 'C' if c == 8.675 else None)   # 교실 B문 맞은편 = 내 방으로
 # 교실 문 구멍 둘레를 덮는 차체 (교실 쪽에서 보이는 부분)
 for c in (4.275, 8.675):
     box(c - DW - .1, c - .475, -.27, -.25, 0, 2.3, 'shell'); box(c + .475, c + DW + .1, -.27, -.25, 0, 2.3, 'shell')
@@ -247,5 +247,5 @@ for k in range(9):
     box(x - .2, x + .2, YC - .17, YC + .17, ZC - .012, ZC - .002, 'fw')
     for j in range(-5, 6): box(x - .18, x + .18, YC + j * .027 - .009, YC + j * .027 + .009, ZC - .016, ZC - .012, 'rubber')
     if k % 3 == 1: sweep([(x + .9, YC, ZC - .002), (x + .9, YC, ZC - .05)], lambda i: .05, 'fw', 14)
-colliders += [[X0, YS - 1, X1, YS], [X0, YN, 3.8, YN + .05], [4.75, YN, 8.2, YN + .05], [9.15, YN, X1, YN + .05]]
-finish((6.5, YC, 1.3), 0.0, {'colliders': [[round(v, 3) for v in c] for c in colliders], 'tunnelTile': TUNNEL_TILE, 'gangway': {'x0': X1, 'x1': VX1, 'yc': YC, 'halfW': VW}, 'carPitch': round(VX1 - X0, 3), 'carX0': X0, 'carYN': YN, 'carYS': YS})
+colliders += [[X0, YS - .3, 8.2, YS], [9.15, YS - .3, X1, YS], [X0, YN, 3.8, YN + .05], [4.75, YN, 8.2, YN + .05], [9.15, YN, X1, YN + .05]]
+finish((6.5, YC, 1.3), 0.0, {'colliders': [[round(v, 3) for v in c] for c in colliders], 'tunnelTile': TUNNEL_TILE, 'gangway': {'x0': X1, 'x1': VX1, 'yc': YC, 'halfW': VW}, 'carPitch': round(VX1 - X0, 3), 'southDoor': {'x0': 8.2, 'x1': 9.15}, 'carX0': X0, 'carYN': YN, 'carYS': YS})

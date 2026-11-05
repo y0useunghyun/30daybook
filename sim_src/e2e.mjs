@@ -19,7 +19,7 @@ assert(Math.hypot(c.x-a.x,c.y-a.y)>.3,'floor click walks'); console.log('2 바�
 a = await w(); await p.mouse.move(640,400); await p.mouse.down(); await p.mouse.move(800,420,{steps:6}); await p.mouse.up(); await p.waitForTimeout(150); c = await w();
 assert(Math.abs(c.yaw-a.yaw)>.2,'drag looks'); console.log('3 끌기 둘러보기 OK');
 // 4) 종이 더미 앞에 서서 눌러 크게 보기 → 뒷면 → 닫기 → 다음 장
-await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(6.75,6.42,0,-32,58))); await p.waitForTimeout(400);
+await p.evaluate(()=>import('/sim/sim.js').then(m=>m.pose(6.75,4.92,0,-32,58))); await p.waitForTimeout(400);
 await p.screenshot({path:`${out}/e_pile.jpg`,type:'jpeg',quality:80});
 const clickPile = async () => { for (const [x,y] of [[640,470],[640,430],[640,510],[600,470],[680,470]]) { await p.mouse.click(x,y); await p.waitForTimeout(350); if (await p.locator('.zoom').isVisible()) return true; } return false; };
 assert(await clickPile(),'pile opens zoom');

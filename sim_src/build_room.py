@@ -16,9 +16,9 @@ M = {
  'block':   dict(map='block', s=(1.2, 1.6), rough=.95, gain=1.5),
  'plaster': dict(map='plaster', s=(7.2, 3.6), rough=.8, gain=1.95, tint='#fffbf2'),
  'ceiling': dict(map='ceiling', s=(1.2, 1.2), rough=1, gain=1.5),
- 'table':   dict(map='table', rough=.38, gain=.86),
- 'table2':  dict(map='table2', rough=.38, gain=.86),
- 'ply':     dict(color='#d6cbaf', rough=.6),
+ 'table':   dict(map='table', rough=.38, gain=.66),
+ 'table2':  dict(map='table2', rough=.38, gain=.66),
+ 'ply':     dict(color='#cfcabb', rough=.6, unlit=True),
  'edge':    dict(color='#d8d6cc', rough=.5),
  'gframe':  dict(color='#8d9196', rough=.45, metal=.6),
  'kframe':  dict(color='#17181a', rough=.5, metal=.3),
@@ -287,14 +287,34 @@ row(3.4, (6.1, 7.3, 8.5), black=(1,))
 row(5.7, (2.1, 3.32, 4.54), black=())
 row(5.7, (6.4, 7.62, 8.84), black=(0, 2))
 # R4 앞줄: 접이식 긴 책상 3 + 책상 1, 뒤쪽 창가 2
-for y in (3.1, 4.6, 6.1):
-    x = 7.75
-    box(x - .3, x + .3, y - .74, y + .74, .76, .79, 'edge', top=None)
-    face([(x - .3, y - .74, .791), (x + .3, y - .74, .791), (x + .3, y + .74, .791), (x - .3, y + .74, .791)], 'table')
-    box(x + .05, x + .07, y - .68, y + .68, .35, .72, 'wdark')
-    for s in (-1, 1):
-        box(x + .03, x + .09, y + s * .66 - .025, y + s * .66 + .025, 0, .76, 'kframe'); box(x - .28, x + .28, y + s * .66 - .025, y + s * .66 + .025, 0, .03, 'kframe')
-    colliders.append([x - .3, y - .74, x + .3, y + .74])
+# 맨 앞줄 (12번 사진): 합판 모서리 윗판, 의자 쪽이 휨. 회색 관 다리 + 바퀴 + 타공판
+def folding_table(x, y, w=.62, l=1.48):
+    n = 64; zt, zb = .79, .755
+    corner = lambda t: .05 * (1 - math.sqrt(max(0, 1 - (1 - min(1, min(t, 1 - t) / .05)) ** 2)))  # 모서리 둥글게
+    west = [(x - w / 2 + .07 * math.sin(i / n * math.pi) ** .7 + corner(i / n), y - l / 2 + l * i / n) for i in range(n + 1)]  # 의자 쪽 오목
+    east = [(x + w / 2 - corner(i / n), y - l / 2 + l * i / n) for i in range(n + 1)]
+    uv = lambda p: ((p[0] - (x - w / 2)) / w, (p[1] - (y - l / 2)) / l)
+    tv = {p: bm.verts.new((*p, zt)) for p in west + east}
+    for i in range(n):
+        q = (west[i], east[i], east[i + 1], west[i + 1])
+        f = bm.faces.new([tv[p] for p in q]); f.material_index = idx['table']
+        for loop_, p in zip(f.loops, q): loop_[uvl].uv = uv(p)
+        face([(*p, zb) for p in q[::-1]], 'edge', uvs=[(0, 0)] * 4)
+        for p, r in ((west[i + 1], west[i]), (east[i], east[i + 1])):
+            face([(*p, zb), (*r, zb), (*r, zt), (*p, zt)], 'ply', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)], smooth=True)
+    for p, r in ((west[0], east[0]), (east[n], west[n])):
+        face([(*p, zb), (*r, zb), (*r, zt), (*p, zt)], 'ply', uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
+    box(x - .02, x + .02, y - .6, y + .6, .32, .7, 'grey')                    # 타공판
+    for s_ in (-1, 1):
+        ly = y + s_ * .62
+        sweep(smooth_path([(x + .02, ly, .72), (x + .02, ly, .5), (x + .02, ly, .22), (x + .14, ly, .12), (x + .24, ly, .1)], 5), .022, 'grey', 9)
+        sweep(smooth_path([(x + .02, ly, .22), (x - .1, ly, .12), (x - .24, ly, .1)], 5), .022, 'grey', 9)
+        box(x - .012, x + .052, ly - .04, ly + .04, .5, .72, 'rubber')          # 접는 뭉치
+        sweep([(x + .02, ly, .28), (x + .02, ly, .46)], .027, 'rubber', 9)       # 다리 싸개
+        for fx in (x + .24, x - .24):
+            sweep([(fx, ly - .018, .04), (fx, ly + .018, .04)], .04, 'rubber', 12)  # 바퀴
+    colliders.append([x - w / 2, y - l / 2, x + w / 2, y + l / 2])
+for y in (3.1, 4.6, 6.1): folding_table(7.75, y)
 chair(7.15, 2.95, jit()); chair(7.15, 4.65, jit(), black=True); chair(7.15, 6.05, jit())
 row(7.85, (7.75, 8.97), black=(0, 1))
 box(7.55, 8.05, 8.8, 9.1, TH_Z + .001, TH_Z + .002, 'paper')

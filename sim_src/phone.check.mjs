@@ -14,7 +14,7 @@ assert(await q.locator('.sim-hint .for-touch').isVisible()); assert(!(await q.lo
 // 대기 중 그리기 멈춤
 await q.evaluate(()=>{window.__draws=0}); await q.waitForTimeout(2000); const idle=await q.evaluate(()=>window.__draws); console.log('가만히 2초 draw', idle); assert(idle===0,'idle draws '+idle);
 // 종이: 앞에서 탭
-await pose(6.75,6.1,0,-35,58); await q.waitForTimeout(400); let hit=false; for(const y of [422,380,460,340,500]){ await q.touchscreen.tap(195,y); await q.waitForTimeout(250); if(await q.locator('.zoom').isVisible()){hit=true;break;} await pose(6.75,6.1,0,-35,58); await q.waitForTimeout(60); }
+await pose(6.75,4.6,0,-35,58); await q.waitForTimeout(400); let hit=false; for(const y of [422,380,460,340,500]){ await q.touchscreen.tap(195,y); await q.waitForTimeout(250); if(await q.locator('.zoom').isVisible()){hit=true;break;} await pose(6.75,4.6,0,-35,58); await q.waitForTimeout(60); }
 assert(hit,'phone pile'); console.log('폰 종이 집기 OK', await q.locator('.zoom .front').getAttribute('src'));
 await q.screenshot({path:`${out}/ph_zoom.jpg`,type:'jpeg',quality:70});
 await q.touchscreen.tap(195,420); await q.waitForTimeout(700); assert(await q.locator('.zoom .sheet.flipped').count()===1,'flip'); await q.touchscreen.tap(195,30); await q.waitForTimeout(250); assert(!(await q.locator('.zoom').isVisible()),'close'); assert.equal(new URL(q.url()).hash,'#sim'); console.log('폰 뒷면·닫기 OK');
