@@ -26,9 +26,11 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   @media (hover: none), (max-width: 600px) {
-    .logo { position: absolute; top: 16px; left: 16px; width: 80px; height: 85px; } /* 폰에선 글 위에 겹치지 않게 같이 스크롤 */
+    /* 메인과 똑같이 고정. 대신 뒤에 흰 띠를 깔아 스크롤되는 글과 안 겹치게 */
+    body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 112px; background: #fff; z-index: 9; }
+    .logo { top: 16px; left: 16px; width: 80px; height: 85px; }
     .logo img { width: 263px; margin: -45px 0 0 -86px; }
-    .side { position: absolute; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 12px; max-width: calc(100vw - 128px); top: 16px; left: auto; right: 16px; padding: 0; }
+    .side { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 12px; max-width: calc(100vw - 128px); top: 16px; left: auto; right: 16px; padding: 0; }
     .side a { font-size: 14px; }
     main { margin-left: 0; padding: 120px 16px 80px; }
     .s { --h: 22px; }
