@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>30 DAYS — 프로젝트 2</title>
+<style>
+  @font-face { font-family: "SUIT"; src: url(../fonts/SUIT-Medium.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+  html, body { margin: 0; background: #fff; color: #000; }
+  body { font-family: "SUIT", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-weight: 500; letter-spacing: -.01em; }
+
+  /* 로고·프로젝트 메뉴: 프로젝트 1(index.html)과 같은 자리 */
+  .logo { position: fixed; top: 24px; left: 24px; width: 128px; height: 136px; overflow: hidden; mix-blend-mode: multiply; z-index: 10; }
+  .logo img { width: 421px; margin: -72px 0 0 -138px; }
+  .projects { position: fixed; left: 24px; bottom: 24px; z-index: 10; }
+  .projects a { display: block; padding: 3px 0; color: #aaa; text-decoration: none; font-size: 17px; letter-spacing: .04em; }
+  .projects a[aria-current], .projects a:hover, .projects a:focus-visible { color: #000; outline: none; }
+
+  /* 문장 목록: 한 문장 = 한 줄. 줄 조각(스캔)은 화면 폭 따라 줄바꿈 */
+  main { margin-left: 200px; padding: 40px 40px 120px 0; }
+  .day { margin: 0 0 72px; }
+  .day h2 { margin: 0 0 24px; font-size: 13px; font-weight: 500; letter-spacing: .08em; color: #aaa; }
+  /* 단어 = 문장 이미지의 한 구간. --h: 화면 글줄 높이, --x·--w: 원본(56px 기준) 위치·폭 */
+  .s { --h: 28px; display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0 0 22px; }
+  .w { height: var(--h); width: calc(var(--w) * var(--h) / 56); overflow: hidden; }
+  .w img { display: block; height: var(--h); width: auto; margin-left: calc(var(--x) * var(--h) / -56); max-width: none; }
+  .s.note { padding-left: 24px; } /* 사견은 원문과 구분되게 한 칸 들여 */
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (hover: none), (max-width: 600px) {
+    .logo { position: absolute; top: 16px; left: 16px; width: 80px; height: 85px; } /* 폰에선 글 위에 겹치지 않게 같이 스크롤 */
+    .logo img { width: 263px; margin: -45px 0 0 -86px; }
+    .projects { left: 16px; bottom: 16px; display: flex; gap: 14px; padding: 6px 8px; margin: -6px -8px; background: #fff; }
+    .projects a { font-size: 14px; }
+    main { margin-left: 0; padding: 120px 16px 80px; }
+    .s { --h: 22px; }
+    .s.note { padding-left: 14px; }
+  }
+</style>
+</head>
+<body>
+  <a class="logo" href="../"><img src="../logo.png" alt="30 DAYS"></a>
+  <nav class="projects" aria-label="프로젝트">
+    <a href="../">프로젝트 1</a>
+    <a href="./" aria-current="page">프로젝트 2</a>
+  </nav>
+  <main id="list" aria-label="30일치 원문과 사견, 문장별로"></main>
+<script>
+  // 문장 목록 = p2_src/split.py 결과. 한 문장 = 이미지 한 장(s/f01-03.jpg), w = 단어마다 [x, 폭]
+  const KIND = { f: "원문", n: "사견" };
+  const pad = (n) => String(n).padStart(2, "0");
+
+  function sentenceEl({ d, k, n, sw, w, t }) {
+    const el = document.createElement("p");
+    el.className = k === "n" ? "s note" : "s";
+    const label = document.createElement("span");
+    label.className = "sr";
+    label.textContent = `${KIND[k]} ${n}: ${t}`;
+    el.append(label);
+    const src = `s/${k}${pad(d)}-${pad(n)}.jpg`;
+    for (const [x, width] of w) {
+      const word = document.createElement("span");
+      word.className = "w";
+      word.style.cssText = `--x:${x};--w:${width}`;
+      const img = document.createElement("img");
+      img.src = src; img.width = sw; img.height = 56; // 같은 src라 한 번만 받음, 비율 미리 잡아 덜컥임 방지
+      img.loading = "lazy"; img.decoding = "async"; img.alt = "";
+      word.append(img);
+      el.append(word);
+    }
+    return el;
+  }
+
+  fetch("sentences.json")
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((items) => {
+      const list = document.getElementById("list");
+      for (let d = 1; d <= 30; d++) {
+        const sec = document.createElement("section");
+        sec.className = "day";
+        const h = document.createElement("h2");
+        h.textContent = `DAY ${pad(d)}`;
+        sec.append(h, ...items.filter((s) => s.d === d && s.k === "f").map(sentenceEl),
+                      ...items.filter((s) => s.d === d && s.k === "n").map(sentenceEl));
+        list.append(sec);
+      }
+    })
+    .catch(() => { document.getElementById("list").textContent = "문장을 불러오지 못했어요. 새로고침해 주세요."; });
+</script>
+</body>
+</html>
