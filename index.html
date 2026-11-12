@@ -86,7 +86,7 @@
   .sim.ready .sim-hint { display: block; }
   .sim-hint.gone { display: none !important; }
 
-  /* INFO·BOOK: 로고 메뉴의 그 줄(INFO/BOOK 글자) 높이에 윗선 맞춰 메뉴 오른쪽으로. top은 JS가 --row-top */
+  /* INFO·BOOK·PROJECT 1: 로고 메뉴의 그 줄 높이에 윗선 맞춰 메뉴 오른쪽으로. top은 JS가 --row-top */
   .books, .info {
     display: none; position: fixed; z-index: 8; left: 168px; top: var(--row-top, 200px);
   }
@@ -167,20 +167,11 @@
   @media (hover: none), (max-width: 600px) {
     .logo { top: 16px; left: 16px; width: 80px; height: 85px; } /* 128×136의 62.5% */
     .logo img { width: 263px; margin: -45px 0 0 -86px; }
-    .side { display: flex; gap: 14px; top: 16px; left: auto; right: 16px; padding: 0; } /* 로고 윗선에 맞춤 */
+    .side { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 12px; max-width: calc(100vw - 128px); top: 16px; left: auto; right: 16px; padding: 0; } /* 로고 윗선에 맞춤. 메뉴 4개라 좁으면 두 줄 */
     .side a { font-size: 14px; }
     .books, .info { top: 120px !important; left: 16px; right: 16px; }
     .books { --paper-w: calc((100vw - 32px - 24px) / 3); gap: 12px; }
     .info p { margin-top: 0; max-width: none; }
-  }
-
-  /* 프로젝트 메뉴: 왼쪽 아래. 지금 프로젝트만 검정 (p2/index.html과 같은 자리) */
-  .projects { position: fixed; left: 24px; bottom: 24px; z-index: 10; }
-  .projects a { display: block; padding: 3px 0; color: #aaa; text-decoration: none; font-size: 17px; letter-spacing: .04em; }
-  .projects a[aria-current], .projects a:hover, .projects a:focus-visible { color: #000; outline: none; }
-  @media (hover: none), (max-width: 600px) {
-    .projects { left: 16px; bottom: 16px; display: flex; gap: 14px; }
-    .projects a { font-size: 14px; }
   }
 
   /* 캐릭터: 마우스를 늦게 따라옴. 평소 c2(웃음), 5초간 안 움직이면 c1(화남) */
@@ -228,8 +219,12 @@
   </section>
   <!-- 복잡: 앞뒤 60장을 흩뿌림. 집어서 옮기기, 누르면 크게 -->
   <section id="mess" class="mess" aria-label="모든 종이"></section>
-  <!-- INFO: 소개 글 -->
+  <!-- INFO: 사이트 전체(프로젝트 1·2) 통합 설명 -->
   <section id="info" class="info" aria-label="소개">
+    <p>30일 동안 매일 책을 읽고, 좋았던 구절을 옮겨 적은 뒤 그 아래에 읽고 든 생각을 적었습니다. 이 사이트는 그렇게 쌓인 종이 묶음을 두 번 다시 읽습니다. PROJECT 1은 종이를 한 장 그대로 웹으로 옮겼고, PROJECT 2는 모든 글을 문장 하나하나로 해체했습니다.</p>
+  </section>
+  <!-- PROJECT 1: 이 화면(종이 묶음) 소개 -->
+  <section id="p1" class="info" aria-label="프로젝트 1 소개">
     <p>30일 동안 매일 책을 읽고, 좋았던 구절을 옮겨 적은 뒤 그 아래에 읽고 든 생각을 적었습니다. 생각을 그대로 보여 드리기는 부끄러워 스프레이로 덮고, 종이 뒷면에 찍어 냈습니다. 그 종이들을 웹으로 옮겼습니다.</p>
   </section>
   <!-- BOOK: 읽은 책 표지 (알라딘 표지 이미지) -->
@@ -251,10 +246,8 @@
   <nav class="side" aria-label="메뉴">
     <a href="#info">INFO</a>
     <a href="#book">BOOK</a>
-  </nav>
-  <nav class="projects" aria-label="프로젝트">
-    <a href="./" aria-current="page">프로젝트 1</a>
-    <a href="p2/">프로젝트 2</a>
+    <a href="#p1">PROJECT 1</a>
+    <a href="p2/">PROJECT 2</a>
   </nav>
   <div class="buddy" aria-hidden="true">
     <img class="c1" src="c1.png" alt="">
@@ -315,7 +308,7 @@
     addEventListener('click', swallow, { capture: true, once: true });
     setTimeout(() => removeEventListener('click', swallow, { capture: true }), SWALLOW_CLICK_MS);
   };
-  const isOpen = () => ['#result', '#mess', '#count', '#book', '#info', '#sim'].includes(location.hash);
+  const isOpen = () => ['#result', '#mess', '#count', '#book', '#info', '#p1', '#sim'].includes(location.hash);
   let downAt = null;
   addEventListener('pointerdown', e => downAt = { x: e.clientX, y: e.clientY, target: e.target });
   addEventListener('pointerup', e => {
@@ -475,7 +468,7 @@
 
   // INFO·BOOK 화면을 메뉴의 해당 글자 줄 높이에 맞춤
   function alignToMenuRow() {
-    if (location.hash !== '#info' && location.hash !== '#book') return; // 빈 해시면 querySelector('')가 오류
+    if (!['#info', '#book', '#p1'].includes(location.hash)) return; // 빈 해시면 querySelector('')가 오류
     const link = document.querySelector(`.side a[href="${location.hash}"]`);
     const view = document.querySelector(location.hash);
     if (!link || !view) return;
@@ -484,7 +477,7 @@
   addEventListener('resize', alignToMenuRow);
 
   const onHash = () => {
-    if (location.hash === '#info' || location.hash === '#book') alignToMenuRow();
+    alignToMenuRow();
     if (location.hash === '#mess') dropPapers();
     if (location.hash === '#count') newRound();
     // 강의실은 무거워서 처음 들어갈 때 불러오고, 나오면 그리기를 멈춤
@@ -620,7 +613,7 @@
 
   addEventListener('wheel', e => {
     // 크게 보기·복잡·글자수 게임 중엔 뒤 배경 안 움직임
-    if (!zoom.hidden || ['#mess', '#count', '#book', '#info', '#sim'].includes(location.hash)) { e.preventDefault(); return; }
+    if (!zoom.hidden || ['#mess', '#count', '#book', '#info', '#p1', '#sim'].includes(location.hash)) { e.preventDefault(); return; }
     if (e.target.closest('.sheets')) { // 지면 띠 위에선 휠을 옆으로 넘기기로
       e.preventDefault();
       sheets.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;

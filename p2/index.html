@@ -9,12 +9,12 @@
   html, body { margin: 0; background: #fff; color: #000; }
   body { font-family: "SUIT", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-weight: 500; letter-spacing: -.01em; }
 
-  /* 로고·프로젝트 메뉴: 프로젝트 1(index.html)과 같은 자리 */
+  /* 로고·메뉴: 프로젝트 1(index.html)과 같은 자리·모양 */
   .logo { position: fixed; top: 24px; left: 24px; width: 128px; height: 136px; overflow: hidden; mix-blend-mode: multiply; z-index: 10; }
   .logo img { width: 421px; margin: -72px 0 0 -138px; }
-  .projects { position: fixed; left: 24px; bottom: 24px; z-index: 10; }
-  .projects a { display: block; padding: 3px 0; color: #aaa; text-decoration: none; font-size: 17px; letter-spacing: .04em; }
-  .projects a[aria-current], .projects a:hover, .projects a:focus-visible { color: #000; outline: none; }
+  .side { position: fixed; left: 24px; top: 160px; z-index: 10; padding: 32px 4px 12px; }
+  .side a { display: block; padding: 3px 0; color: #000; text-decoration: none; font-size: 17px; letter-spacing: .04em; }
+  .side a:hover, .side a:focus-visible { text-decoration: underline; text-underline-offset: 4px; outline: none; }
 
   /* 문장 목록: 한 문장 = 한 줄. 줄 조각(스캔)은 화면 폭 따라 줄바꿈 */
   main { margin-left: 200px; padding: 40px 40px 120px 0; }
@@ -30,8 +30,8 @@
   @media (hover: none), (max-width: 600px) {
     .logo { position: absolute; top: 16px; left: 16px; width: 80px; height: 85px; } /* 폰에선 글 위에 겹치지 않게 같이 스크롤 */
     .logo img { width: 263px; margin: -45px 0 0 -86px; }
-    .projects { left: 16px; bottom: 16px; display: flex; gap: 14px; padding: 6px 8px; margin: -6px -8px; background: #fff; }
-    .projects a { font-size: 14px; }
+    .side { position: absolute; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 12px; max-width: calc(100vw - 128px); top: 16px; left: auto; right: 16px; padding: 0; }
+    .side a { font-size: 14px; }
     main { margin-left: 0; padding: 120px 16px 80px; }
     .s { --h: 22px; }
     .s.note { padding-left: 14px; }
@@ -40,9 +40,11 @@
 </head>
 <body>
   <a class="logo" href="../"><img src="../logo.png" alt="30 DAYS"></a>
-  <nav class="projects" aria-label="프로젝트">
-    <a href="../">프로젝트 1</a>
-    <a href="./" aria-current="page">프로젝트 2</a>
+  <nav class="side" aria-label="메뉴">
+    <a href="../#info">INFO</a>
+    <a href="../#book">BOOK</a>
+    <a href="../#p1">PROJECT 1</a>
+    <a href="./" aria-current="page">PROJECT 2</a>
   </nav>
   <main id="list" aria-label="30일치 원문과 사견, 문장별로"></main>
 <script>
